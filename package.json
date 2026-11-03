@@ -1,0 +1,11 @@
+{
+  "name": "gtme-school-vsl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GTME.School VSL landing pages (individual and corporate) for paid campaigns",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "test": "node --test tests/apply.test.js"
+  },
+  "engines": { "node": ">=18" }
+}
