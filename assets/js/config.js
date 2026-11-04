@@ -19,9 +19,10 @@ window.GTME_CONFIG = {
     googleAds: {
       id: '',               // e.g. 'AW-123456789'. Leave empty if Google Ads conversions run through GTM.
       conversions: {        // conversion labels, e.g. Lead: 'AbCdEfGhIj'
-        Lead: '',
-        CompleteRegistration: '',
-        Schedule: ''
+        Lead: '',                // individual: fires when step 1 (name, email, phone) is saved
+        SubmitApplication: '',   // individual: fires when the whole application is sent
+        CompleteRegistration: '',// fires on the qualified page
+        Schedule: ''             // fires when a call is booked
       }
     }
   },
@@ -39,19 +40,39 @@ window.GTME_CONFIG = {
       // VSL video. Either an .mp4 URL, or a YouTube / Vimeo / Wistia / Loom embed URL.
       videoSrc: '',
       videoPoster: '',
-      // Calendly event URL for qualified applicants, e.g. 'https://calendly.com/gtme-school/discovery-call'
-      calendlyUrl: '',
 
-      // Qualification. Applicants that match ANY rule below are not offered the booking step.
-      // Default rule comes from the program document: applicants must be able to commit 8–10 hours a week.
+      // Call booking for qualified applicants, shown on /apply/qualified.
+      // A Cal.com link (e.g. 'https://cal.com/gtme-school/strategy-call') or a Calendly link both work.
+      bookingUrl: '',
+      calendlyUrl: '', // older setting, still read if bookingUrl is empty
+
+      // Where each applicant goes after the multi-step form.
+      routes: {
+        qualified: '/apply/qualified',   // calendar embedded straight away
+        notQualified: '/apply/not-a-fit', // offer the recorded course instead
+        booked: '/apply/booked'          // thank-you + what to prepare, after the call is booked
+      },
+
+      // The recorded course offered to applicants who aren't ready for the program.
+      downsell: {
+        url: '',                 // checkout or landing page for the recorded course, e.g. 'https://gtme.school/course'
+        price: '₹999',
+        name: 'The GTM Engineering Starter Course'
+      },
+
+      // Short "what to prepare" video on the booked page (optional). .mp4 or YouTube / Vimeo / Loom link.
+      prepVideoSrc: '',
+
+      // Qualification: applicants matching ANY rule are not qualified and go to routes.notQualified.
+      // Default (from the VSL architecture doc): qualified = ready to invest the $4,000, with or without a payment plan.
       qualification: {
         disqualifyIf: [
-          { field: 'hours', in: ['Less than 5 hours', '5–8 hours'] }
+          { field: 'invest', in: ['Not right now'] }
+          // , { field: 'hours_ok', in: ['No'] }   // uncomment to also route people without 6–10 hours a week
         ]
       },
-      // Investment / income question. Off until the business approves the wording and options.
       askInvestment: false,
-      investmentOptions: ['Ready to invest in a program now', 'Would need to plan for it', 'Not able to invest right now']
+      investmentOptions: []
     },
 
     /* ---------------- Corporate VSL (/corporate-vsl) ---------------- */

@@ -1,6 +1,6 @@
 # GTME.School — Individual landing page (standalone Vercel project)
 
-Serves `vsl.html` at `/` and `/vsl`. The link to the other page (`/corporate-vsl`) redirects to https://gtme.school until you change the `redirects` destination in `vercel.json` to wherever the other page is deployed.
+Serves `vsl.html` at `/` and `/vsl`. The link to the other page (`/corporate-vsl`) redirects to https://gtme.school until you change the `redirects` destination in `vercel.json`.
 
 ---
 
@@ -101,3 +101,29 @@ See the checklist in the pull request / hand-off notes. In short: the edited VSL
 - The countdown in the top notice reads `data-deadline` on `vsl.html` and hides itself once the date passes.
 - Market figures (63 → 3,342 postings, +5,205%, ~70% mention Clay, 71% use AI tools) come from Nish's YouTube research slides. Confirm the original sources before running ads.
 - Result numbers (24.8K sent, 2.3% reply, 183 opportunities; 23.5K / 81; 549 / 37 / 25) are read from the dashboard screenshots in `assets/img`.
+
+## Individual funnel v2.2: multi-step application and routing
+
+```
+/vsl  ── 7-step application ──┬─ qualified ──────▶ /apply/qualified  (Cal.com calendar, prefilled) ──▶ /apply/booked (what to prepare)
+                              └─ not qualified ──▶ /apply/not-a-fit  (recorded course, ₹999)
+```
+
+- **Step 1** asks for name, email and phone/WhatsApp, and is POSTed to `/api/apply` as `stage: "contact"` the moment the person clicks Continue, so abandoned forms can be followed up.
+- **Steps 2–7** are one-click questions (also keyboard A–F): which best describes you, the goal in 6 months, what you've tried so far, 6–10 hours a week, the $4,000 investment and when you want to start.
+- **Qualification** lives in `funnels.individual.qualification` in `config.js`. By default anyone answering "Not right now" to the investment question goes to the course offer, and "Yes" or "Need a payment plan" goes to the calendar.
+- **Settings to fill in** (`config.js`): `bookingUrl` (a Cal.com or Calendly link), `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
+
+### Stages sent to the webhook (for a CRM)
+
+Every request carries the same `lead_id`, so Zapier / Make / n8n can upsert one record and move it through a pipeline:
+
+| `stage` | `lead_stage` | When |
+|---|---|---|
+| `contact` | `started` | step 1 completed |
+| `application` | `qualified` / `not_qualified` | all 7 steps sent |
+| `call_booked` | `call_booked` | call booked on `/apply/qualified` (includes `booking_time`, `booking_ref`) |
+
+### Tracking events (individual)
+
+`Lead` when step 1 is saved · `ApplicationStep` per step · `SubmitApplication` (Meta standard event) when the application is sent · `CompleteRegistration` on `/apply/qualified` · `Disqualified` and `DownsellClick` on `/apply/not-a-fit` · `BookingView` and `Schedule` on the calendar. The corporate page is unchanged.

@@ -9,6 +9,18 @@
     {
       "source": "/vsl",
       "destination": "/vsl.html"
+    },
+    {
+      "source": "/apply/qualified",
+      "destination": "/apply-qualified.html"
+    },
+    {
+      "source": "/apply/not-a-fit",
+      "destination": "/apply-not-a-fit.html"
+    },
+    {
+      "source": "/apply/booked",
+      "destination": "/apply-booked.html"
     }
   ],
   "headers": [

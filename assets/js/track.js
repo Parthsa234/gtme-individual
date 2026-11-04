@@ -17,7 +17,7 @@
   'use strict';
   var cfg = (w.GTME_CONFIG && w.GTME_CONFIG.tracking) || {};
   var debug = !!(w.GTME_CONFIG && w.GTME_CONFIG.debug) || /[?&]debug=1\b/.test(w.location.search);
-  var META_STANDARD = { PageView: 1, ViewContent: 1, Lead: 1, CompleteRegistration: 1, Schedule: 1, Contact: 1 };
+  var META_STANDARD = { PageView: 1, ViewContent: 1, Lead: 1, CompleteRegistration: 1, Schedule: 1, Contact: 1, SubmitApplication: 1 };
   var fired = {};
   w.__gtmeEvents = w.__gtmeEvents || [];
   w.dataLayer = w.dataLayer || [];
