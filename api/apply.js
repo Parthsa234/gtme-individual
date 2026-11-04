@@ -12,11 +12,25 @@
 'use strict';
 
 const LIMITS = { full_name: 120, email: 160, work_email: 160, phone: 30, company: 160, role: 80, experience: 40, hours: 40,
-  investment: 120, why: 1500, goals: 1500, team_size: 40, motion: 80, timeline: 40 };
+  investment: 120, why: 1500, goals: 1500, team_size: 40, motion: 80, timeline: 40,
+  // individual multi-step application
+  persona: 80, goal: 120, tried: 160, hours_ok: 20, invest: 80, start: 80, lead_id: 64, booking_time: 80, booking_ref: 120 };
+/*
+ * Individual applications arrive in stages, all with the same lead_id so a CRM can upsert one record:
+ *   contact      step 1 only (name, email, phone) — saved the moment step 1 is completed, so abandoned forms can be followed up
+ *   application  every question answered; carries qualified true/false
+ *   call_booked  the qualified applicant booked a call on the confirmation page
+ * Corporate enquiries are a single stage ("application").
+ */
 const REQUIRED = {
-  individual: ['full_name', 'email', 'phone', 'role', 'experience', 'hours', 'why'],
-  corporate: ['full_name', 'work_email', 'company', 'role', 'team_size', 'motion', 'timeline', 'goals']
+  individual: {
+    contact: ['full_name', 'email', 'phone'],
+    application: ['full_name', 'email', 'phone', 'persona', 'goal', 'tried', 'hours_ok', 'invest', 'start'],
+    call_booked: ['email']
+  },
+  corporate: { application: ['full_name', 'work_email', 'company', 'role', 'team_size', 'motion', 'timeline', 'goals'] }
 };
+const STAGE_TO_LEAD_STAGE = { contact: 'started', call_booked: 'call_booked' };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE = /^\+?[0-9 ()\-]{7,20}$/;
 
@@ -27,17 +41,20 @@ function validate(body) {
   const errors = {};
   if (!body || typeof body !== 'object') return { ok: false, errors: { body: 'invalid' } };
   const funnel = body.funnel === 'corporate' ? 'corporate' : 'individual';
-  const data = { funnel };
+  const stages = REQUIRED[funnel];
+  const stage = stages[body.stage] ? body.stage : 'application';
+  const data = { funnel, stage };
   for (const k of Object.keys(LIMITS)) if (body[k] !== undefined) data[k] = clean(body[k], LIMITS[k]);
-  for (const k of REQUIRED[funnel]) if (!data[k]) errors[k] = 'required';
+  for (const k of stages[stage]) if (!data[k]) errors[k] = 'required';
   const mail = funnel === 'corporate' ? 'work_email' : 'email';
   if (data[mail] && !EMAIL.test(data[mail])) errors[mail] = 'invalid';
   if (data.phone && !PHONE.test(data.phone)) errors.phone = 'invalid';
-  const text = funnel === 'corporate' ? 'goals' : 'why';
-  if (data[text] && data[text].length < 30) errors[text] = 'too_short';
-  if (body.consent !== true) errors.consent = 'required';
+  if (funnel === 'corporate' && data.goals && data.goals.length < 30) errors.goals = 'too_short';
+  if (stage !== 'call_booked' && body.consent !== true) errors.consent = 'required';
   data.consent = body.consent === true;
   data.qualified = body.qualified === true;
+  // A single pipeline field for the CRM: started → qualified / not_qualified → call_booked
+  data.lead_stage = STAGE_TO_LEAD_STAGE[stage] || (funnel === 'individual' ? (data.qualified ? 'qualified' : 'not_qualified') : 'enquiry');
   data.page = clean(body.page, 100);
   const a = body.attribution && typeof body.attribution === 'object' ? body.attribution : {};
   data.attribution = {};
@@ -74,7 +91,7 @@ async function handler(req, res) {
     const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
     clearTimeout(t);
     if (!r.ok) throw new Error('webhook ' + r.status);
-    return res.status(200).json({ ok: true, qualified: v.data.qualified });
+    return res.status(200).json({ ok: true, stage: v.data.stage, qualified: v.data.qualified });
   } catch (e) {
     console.error('[apply] forward failed:', e && e.message);
     return res.status(502).json({ ok: false, error: 'upstream', message: 'We couldn’t save your application just now. Please try again in a minute, or email hello@gtme.school.' });
