@@ -139,7 +139,7 @@ tests/apply.test.js            handler tests
 
 ## Still needed before ads go live
 
-See the checklist in the pull request / hand-off notes. In short: the edited VSL videos, Calendly URLs, Pixel / GTM / Google Ads IDs, a webhook destination, verified student proof, a privacy policy URL, and sign-off on the qualification rules and the corporate program format.
+See the checklist in the pull request / hand-off notes. In short: the edited VSL videos, Pixel / GTM / Google Ads IDs, verified student proof, a privacy policy URL, the recorded-course checkout URL, and sign-off on the qualification rules and the corporate program format. (Applications already store to Supabase, and the call calendar is live.)
 
 ## v2 design notes
 
@@ -157,7 +157,8 @@ See the checklist in the pull request / hand-off notes. In short: the edited VSL
 - **Step 1** asks for name, email and phone/WhatsApp, and is POSTed to `/api/apply` as `stage: "contact"` the moment the person clicks Continue, so abandoned forms can be followed up.
 - **Steps 2–7** are one-click questions (also keyboard A–F): which best describes you, the goal in 6 months, what you've tried so far, 6–10 hours a week, the $4,000 investment and when you want to start.
 - **Qualification** lives in `funnels.individual.qualification` in `config.js`. By default anyone answering "Not right now" to the investment question goes to the course offer, and "Yes" or "Need a payment plan" goes to the calendar.
-- **Settings to fill in** (`config.js`): `bookingUrl` (a Cal.com or Calendly link), `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
+- **Booking** is `funnels.individual.bookingUrl` in `config.js`, set to `https://cal.com/shrinishkarsh/gtme-school`. It is embedded inline on `/apply/qualified` with the applicant's name and email prefilled, and a confirmed booking posts `stage: "call_booked"` back to `/api/apply`. Change the link there and the embed and its namespace follow.
+- **Still to fill in** (`config.js`): `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
 
 ### Stages (for Supabase and the optional CRM webhook)
 

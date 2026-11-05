@@ -243,24 +243,33 @@
         if (e.data.event === 'calendly.event_scheduled') onBooked({ ref: (e.data.payload && e.data.payload.event && e.data.payload.event.uri) || '' });
       });
     } else {
-      // Cal.com inline embed (https://cal.com/docs/developing/guides/embeds)
-      var origin = /cal\.com$/.test(u.hostname) ? 'https://cal.com' : u.origin;
-      var calLink = u.pathname.replace(/^\/+|\/+$/g, '');
+      /* Cal.com inline embed, in the namespaced form Cal's own embed snippet generates
+         (https://cal.com/docs/developing/guides/embeds). calLink and the namespace both come from
+         bookingUrl, so changing the link in config.js is enough. Note the handlers are registered
+         on the namespace api, not on the global Cal — on a namespaced embed a booking is only
+         reported back through Cal.ns[namespace], and without that the call would never reach
+         /api/apply as stage "call_booked". */
+      var calLink = u.pathname.replace(/^\/+|\/+$/g, '');                  // 'shrinishkarsh/gtme-school'
+      var ns = F.bookingNamespace || calLink.split('/').pop() || 'booking'; // 'gtme-school'
       var el = d.createElement('div'); el.id = 'cal-inline'; el.style.cssText = 'width:100%;min-height:680px;overflow:auto'; box.appendChild(el);
       (function (C, A, L) { var p = function (a, ar) { a.q.push(ar); }; var doc = C.document;
         C.Cal = C.Cal || function () { var cal = C.Cal, ar = arguments; if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; doc.head.appendChild(doc.createElement('script')).src = A; cal.loaded = true; }
-          if (ar[0] === L) { var api = function () { p(api, arguments); }, ns = ar[1]; api.q = api.q || []; if (typeof ns === 'string') { cal.ns[ns] = cal.ns[ns] || api; p(cal.ns[ns], ar); p(cal, ['initNamespace', ns]); } else p(cal, ar); return; }
+          if (ar[0] === L) { var api = function () { p(api, arguments); }, nsArg = ar[1]; api.q = api.q || []; if (typeof nsArg === 'string') { cal.ns[nsArg] = cal.ns[nsArg] || api; p(cal.ns[nsArg], ar); p(cal, ['initNamespace', nsArg]); } else p(cal, ar); return; }
           p(cal, ar); };
       })(w, 'https://app.cal.com/embed/embed.js', 'init');
-      w.Cal('init', { origin: origin });
-      var conf = { layout: 'month_view', theme: 'light' };
+      w.Cal('init', ns, { origin: F.bookingOrigin || 'https://app.cal.com' });
+      w.Cal.config = w.Cal.config || {};
+      w.Cal.config.forwardQueryParams = true; // carries utm_* / fbclid through to the booking
+      var cal = w.Cal.ns[ns];
+      // theme is pinned light because the booking section of the page is light in both schemes
+      var conf = { layout: 'month_view', useSlotsViewOnSmallScreen: 'true', theme: 'light' };
       if (me.full_name) conf.name = me.full_name;
       if (me.email) conf.email = me.email;
-      w.Cal('inline', { elementOrSelector: '#cal-inline', calLink: calLink, config: conf });
-      w.Cal('ui', { styles: { branding: { brandColor: '#C2400F' } }, hideEventTypeDetails: false, layout: 'month_view' });
-      w.Cal('on', { action: 'linkReady', callback: function () { track('BookingView', { content_category: 'individual' }); } });
+      cal('inline', { elementOrSelector: '#cal-inline', calLink: calLink, config: conf });
+      cal('ui', { hideEventTypeDetails: false, layout: 'month_view' });
+      cal('on', { action: 'linkReady', callback: function () { track('BookingView', { content_category: 'individual' }); } });
       ['bookingSuccessful', 'bookingSuccessfulV2'].forEach(function (action) {
-        w.Cal('on', { action: action, callback: function (e) { var dt = (e && e.detail && e.detail.data) || {}; onBooked({ time: dt.startTime || dt.date || '', ref: (dt.booking && dt.booking.uid) || dt.uid || '' }); } });
+        cal('on', { action: action, callback: function (e) { var dt = (e && e.detail && e.detail.data) || {}; onBooked({ time: dt.startTime || dt.date || '', ref: (dt.booking && dt.booking.uid) || dt.uid || '' }); } });
       });
     }
     box.classList.add('live');

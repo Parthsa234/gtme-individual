@@ -42,8 +42,10 @@ window.GTME_CONFIG = {
       videoPoster: '',
 
       // Call booking for qualified applicants, shown on /apply/qualified.
-      // A Cal.com link (e.g. 'https://cal.com/gtme-school/strategy-call') or a Calendly link both work.
-      bookingUrl: '',
+      // A Cal.com link or a Calendly link both work.
+      bookingUrl: 'https://cal.com/shrinishkarsh/gtme-school',
+      // Cal.com embed namespace. Defaults to the event slug from bookingUrl ('gtme-school').
+      bookingNamespace: 'gtme-school',
       calendlyUrl: '', // older setting, still read if bookingUrl is empty
 
       // Where each applicant goes after the multi-step form.
