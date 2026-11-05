@@ -1,40 +1,24 @@
 /*
  * Applies supabase/migrations/*.sql to the connected Supabase project.
  *
- * Runs as the Vercel build step (see "buildCommand" in vercel.json), where the Postgres
- * credentials the Supabase integration installed are already in the environment. That means the
- * tables /api/apply writes to exist before the deployment goes live, and no database password
- * ever has to be copied anywhere by hand. Every migration is idempotent, so re-running on each
- * deploy is a no-op once the schema is in place.
- *
- * It never fails the build: a database hiccup must not stop the landing page from deploying.
- * Check the build log for "[migrate]" lines to see what happened.
- *
- * Locally:  POSTGRES_URL='postgresql://...' npm run migrate
+ * Two ways to put the schema in place; both apply api/_schema.js, which is idempotent:
+ *   - this script, with a connection string:  POSTGRES_URL='postgresql://...' npm run migrate
+ *   - GET /api/migrate?token=... on a deployment, which uses the Postgres credentials the
+ *     Supabase integration already installed there, so no password is copied by hand.
  */
 'use strict';
-const fs = require('fs');
-const path = require('path');
+const schema = require('../api/_schema.js');
 
 const CANDIDATES = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL'];
 
-function sqlFiles() {
-  const dir = path.join(__dirname, '..', 'supabase', 'migrations');
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(function (f) { return f.endsWith('.sql'); }).sort()
-    .map(function (f) { return { name: f, sql: fs.readFileSync(path.join(dir, f), 'utf8') }; });
-}
-
 async function main() {
-  const files = sqlFiles();
-  if (!files.length) return console.log('[migrate] no migrations found, nothing to do');
-
+  const files = [schema];
   const urls = CANDIDATES.map(function (k) { return { key: k, url: process.env[k] }; }).filter(function (c) { return c.url; });
-  if (!urls.length) return console.warn('[migrate] no Postgres connection string in the environment (' + CANDIDATES.join(', ') + ') — skipping. Run supabase/migrations/*.sql by hand in the Supabase SQL editor.');
+  if (!urls.length) return console.warn('[migrate] no Postgres connection string in the environment (' + CANDIDATES.join(', ') + ') — skipping. Use GET /api/migrate?token=... instead, or paste supabase/migrations/0001_applications.sql into the Supabase SQL editor.');
 
   let Client;
   try { Client = require('pg').Client; } catch (e) {
-    return console.warn('[migrate] the "pg" package is not installed — skipping. Run `npm install` or apply supabase/migrations/*.sql by hand.');
+    return console.warn('[migrate] the "pg" package is not installed — skipping. Run `npm install` or apply the SQL by hand.');
   }
 
   for (const cand of urls) {

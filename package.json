@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "test": "node --test tests/apply.test.js",
-    "migrate": "node scripts/migrate.js",
-    "build": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js"
   },
   "engines": {
     "node": ">=18"

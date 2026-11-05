@@ -20,7 +20,7 @@ Same stack as gtme.school: static HTML, one CSS file, vanilla JS, no build step.
 ```bash
 npm run dev          # http://localhost:3000/vsl and /corporate-vsl
 npm test             # unit tests for /api/apply
-npm run migrate      # apply supabase/migrations/*.sql (needs POSTGRES_URL)
+npm run migrate      # create the Supabase tables (needs POSTGRES_URL)
 ```
 
 To exercise the real database locally, pull the project's variables first
@@ -65,12 +65,16 @@ To read the data: Supabase dashboard → Table Editor → `applications` (or SQL
 
 ### Migrations
 
-`npm run build` (which is what Vercel runs, see `buildCommand` in `vercel.json`) applies every file
-in `supabase/migrations/` using the Postgres credentials the Supabase integration installed, so the
-tables exist before a deployment goes live. The SQL is idempotent, so it is a no-op on later
-deploys. It never fails the build — if the database is unreachable the page still ships and the
-build log says `[migrate] …`. To apply by hand instead, paste the migration into the Supabase SQL
-editor, or run `POSTGRES_URL='postgresql://…' npm run migrate` locally.
+The schema lives in `api/_schema.js` (mirrored readably in
+`supabase/migrations/0001_applications.sql`) and every statement is idempotent. Three ways to
+apply it, in order of convenience:
+
+1. **From the deployment.** Add a `DB_SETUP_TOKEN` environment variable with any long random
+   value, redeploy, then open `/api/migrate?token=<that value>`. It connects with the Postgres
+   credentials the Supabase integration installed, creates everything and reports the row counts.
+   **Delete `DB_SETUP_TOKEN` afterwards** — without it the route answers 404 and does nothing.
+2. **Supabase SQL editor.** Paste `supabase/migrations/0001_applications.sql` and run it.
+3. **Locally.** `vercel env pull .env.local`, then `POSTGRES_URL='postgresql://…' npm run migrate`.
 
 ## Configure — `assets/js/config.js`
 
@@ -125,8 +129,10 @@ assets/js/vsl.js               video, testimonials, proof slots, form, qualifica
 assets/js/motion.js            v2 motion only: scroll progress, counters, sticky engine, live-build demo, tabs, rails, calculator
 api/apply.js                   serverless form handler (validation, honeypot, Supabase, webhook forwarding)
 api/_supabase.js               writes each submission to the applications / application_events tables
-supabase/migrations/*.sql      the schema, applied at build time by scripts/migrate.js
-scripts/migrate.js             applies the migrations (Vercel buildCommand, or `npm run migrate`)
+api/_schema.js                 the schema both migration paths apply
+api/migrate.js                 one-time, DB_SETUP_TOKEN-guarded route that creates the tables
+supabase/migrations/*.sql      the same schema, to paste into the Supabase SQL editor
+scripts/migrate.js             applies the schema from a connection string (`npm run migrate`)
 scripts/dev.js                 local server that mirrors vercel.json
 tests/apply.test.js            handler tests
 ```

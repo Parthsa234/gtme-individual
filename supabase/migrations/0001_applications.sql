@@ -11,7 +11,7 @@
 --
 -- RLS is enabled with no policies, so the browser's anon/publishable key can neither read nor
 -- write these tables. Only the serverless function (service-role key) and the Supabase
--- dashboard can touch them. Do not add a policy for `anon`.
+-- dashboard can touch them. Do not add a policy for the anon role.
 
 create extension if not exists pgcrypto;
 

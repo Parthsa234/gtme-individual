@@ -1,6 +1,4 @@
 {
-  "buildCommand": "node scripts/migrate.js",
-  "outputDirectory": ".",
   "cleanUrls": false,
   "trailingSlash": false,
   "rewrites": [
