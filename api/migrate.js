@@ -16,6 +16,16 @@ const schema = require('./_schema.js');
 
 const CANDIDATES = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL'];
 
+/* Supabase serves its database behind a certificate chain Node does not trust by default, so the
+   connection is made with rejectUnauthorized:false. node-postgres lets `sslmode` in the
+   connection string win over the ssl option, which would reinstate verification and fail with
+   "self-signed certificate in certificate chain" — so strip it and set ssl explicitly. */
+function clientOptions(connectionString) {
+  let cs = connectionString;
+  try { const u = new URL(cs); u.searchParams.delete('sslmode'); cs = u.toString(); } catch (e) {}
+  return { connectionString: cs, ssl: { rejectUnauthorized: false } };
+}
+
 function timingSafeEqual(a, b) {
   const crypto = require('crypto');
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
@@ -40,7 +50,7 @@ module.exports = async function handler(req, res) {
   const tried = [];
   for (const key of CANDIDATES) {
     if (!process.env[key]) continue;
-    const client = new Client({ connectionString: process.env[key], ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10000, statement_timeout: 60000 });
+    const client = new Client(Object.assign(clientOptions(process.env[key]), { connectionTimeoutMillis: 10000, statement_timeout: 60000 }));
     try {
       await client.connect();
       await client.query(schema.sql);
