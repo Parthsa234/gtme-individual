@@ -39,15 +39,6 @@
     }, { rootMargin: '-45% 0px -50% 0px' });
   }
 
-  /* ---------------------------------------------------------- countdown notice */
-  $$('[data-deadline]').forEach(function (el) {
-    var end = new Date(el.getAttribute('data-deadline'));
-    var days = Math.ceil((end - new Date()) / 864e5);
-    var bar = el.closest('.notice');
-    if (isNaN(days) || days < 0) { if (bar) bar.hidden = true; return; }
-    el.textContent = days === 0 ? 'last day' : days + (days === 1 ? ' day left' : ' days left');
-  });
-
   /* ---------------------------------------------------------- hero: glow, tilt, rotator, toasts */
   var hero = $('.hero'), mon = $('.monitor'), hv0 = $('.hero-v');
   if (hero && fine && !reduce) {

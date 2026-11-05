@@ -5,7 +5,14 @@
   "description": "GTME.School VSL landing pages (individual and corporate) for paid campaigns",
   "scripts": {
     "dev": "node scripts/dev.js",
-    "test": "node --test tests/apply.test.js"
+    "test": "node --test tests/apply.test.js",
+    "migrate": "node scripts/migrate.js",
+    "build": "node scripts/migrate.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
 }

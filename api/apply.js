@@ -1,15 +1,27 @@
 /*
- * POST /api/apply — receives VSL applications and forwards them to the team's system.
+ * POST /api/apply — receives VSL applications, stores them in Supabase and (optionally)
+ * forwards them to the team's CRM or automation tool.
  *
- * Environment variables (set in Vercel → Project → Settings → Environment Variables):
- *   APPLY_WEBHOOK_URL            required. Where applications are sent (Zapier, Make, n8n, a CRM webhook, Slack…).
- *   CORPORATE_WEBHOOK_URL        optional. Separate destination for /corporate-vsl enquiries. Falls back to APPLY_WEBHOOK_URL.
- *   APPLY_WEBHOOK_SECRET         optional. Sent as the X-GTME-Secret header so the receiver can reject forged requests.
+ * Destinations, in order:
+ *   1. Supabase  — the applications / application_events tables. Active as soon as the
+ *                   Vercel ↔ Supabase integration has set SUPABASE_URL and a service-role key,
+ *                   which is the normal case for this project. No extra configuration needed.
+ *   2. Webhook   — only if APPLY_WEBHOOK_URL is set. Best-effort: a webhook failure does not
+ *                   lose the application, because Supabase already has it.
  *
- * Nothing secret ever reaches the browser. Without APPLY_WEBHOOK_URL the endpoint answers 503
- * and the page falls back to a pre-filled email.
+ * Environment variables (Vercel → Project → Settings → Environment Variables):
+ *   SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL              set by the Supabase integration
+ *   SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY       set by the Supabase integration
+ *   APPLY_WEBHOOK_URL            optional. Zapier / Make / n8n / CRM / Slack webhook.
+ *   CORPORATE_WEBHOOK_URL        optional. Separate destination for corporate enquiries.
+ *   APPLY_WEBHOOK_SECRET         optional. Sent as X-GTME-Secret so the receiver can reject forged posts.
+ *
+ * Nothing secret ever reaches the browser. If neither Supabase nor a webhook is configured the
+ * endpoint answers 503 and the page falls back to a pre-filled email.
  */
 'use strict';
+
+const store = require('./_supabase.js');
 
 const LIMITS = { full_name: 120, email: 160, work_email: 160, phone: 30, company: 160, role: 80, experience: 40, hours: 40,
   investment: 120, why: 1500, goals: 1500, team_size: 40, motion: 80, timeline: 40,
@@ -76,25 +88,53 @@ async function handler(req, res) {
   if (!v.ok) return res.status(400).json({ ok: false, error: 'validation', fields: v.errors, message: 'Some fields need attention. Please check the form and try again.' });
 
   const url = (v.data.funnel === 'corporate' && process.env.CORPORATE_WEBHOOK_URL) || process.env.APPLY_WEBHOOK_URL;
-  if (!url) return res.status(503).json({ ok: false, error: 'not_configured' });
+  const toDatabase = store.isConfigured();
+  // Nowhere to put it: let the page fall back to a pre-filled email rather than silently dropping it.
+  if (!toDatabase && !url) return res.status(503).json({ ok: false, error: 'not_configured' });
 
-  const payload = Object.assign({}, v.data, {
+  const meta = {
     submitted_at: new Date().toISOString(),
     user_agent: String(req.headers['user-agent'] || '').slice(0, 300)
+  };
+  const payload = Object.assign({}, v.data, meta);
+
+  const [saved, forwarded] = await Promise.all([
+    toDatabase ? store.save(v.data, meta) : Promise.resolve(null),
+    url ? forward(url, payload) : Promise.resolve(null)
+  ]);
+
+  if (saved && !saved.ok) console.error('[apply] supabase save failed:', saved.status, saved.error);
+  if (forwarded && !forwarded.ok) console.error('[apply] forward failed:', forwarded.error);
+
+  // The application is safe if any destination we actually tried accepted it. Only ask the
+  // applicant to retry when every configured destination failed.
+  const attempted = [saved, forwarded].filter(Boolean);
+  if (!attempted.some(function (r) { return r.ok; })) {
+    return res.status(502).json({ ok: false, error: 'upstream', message: 'We couldn’t save your application just now. Please try again in a minute, or email hello@gtme.school.' });
+  }
+  return res.status(200).json({
+    ok: true,
+    stage: v.data.stage,
+    qualified: v.data.qualified,
+    lead_id: (saved && saved.lead_id) || v.data.lead_id || undefined,
+    stored: Boolean(saved && saved.ok)
   });
+}
+
+/** Best-effort POST to the team's webhook. Never throws. */
+async function forward(url, payload) {
   const headers = { 'Content-Type': 'application/json' };
   if (process.env.APPLY_WEBHOOK_SECRET) headers['X-GTME-Secret'] = process.env.APPLY_WEBHOOK_SECRET;
-
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10000);
     const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
-    clearTimeout(t);
-    if (!r.ok) throw new Error('webhook ' + r.status);
-    return res.status(200).json({ ok: true, stage: v.data.stage, qualified: v.data.qualified });
+    if (!r.ok) return { ok: false, error: 'webhook ' + r.status };
+    return { ok: true };
   } catch (e) {
-    console.error('[apply] forward failed:', e && e.message);
-    return res.status(502).json({ ok: false, error: 'upstream', message: 'We couldn’t save your application just now. Please try again in a minute, or email hello@gtme.school.' });
+    return { ok: false, error: (e && e.message) || 'webhook unreachable' };
+  } finally {
+    clearTimeout(t);
   }
 }
 

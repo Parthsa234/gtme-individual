@@ -81,10 +81,7 @@ button{font:inherit}
 @media (max-width:520px){.top .btn .full{display:none}.top .btn .short{display:inline}}
 .ctas{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:32px}
 
-/* ---------- announcement + header ---------- */
-.notice{background:var(--grad);color:#fff;font-family:var(--sub);font-size:13.5px;text-align:center;padding:9px var(--gut);position:relative;z-index:61}
-.notice a{color:#fff;font-weight:500;text-underline-offset:3px}
-.notice b{font-family:var(--h);font-weight:700;letter-spacing:.02em}
+/* ---------- header ---------- */
 .top{position:sticky;top:0;z-index:60;height:var(--head);display:flex;align-items:center;background:rgba(14,14,14,.72);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--nline);color:#fff;transition:background .3s}
 .top.scrolled{background:rgba(14,14,14,.92)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}

@@ -20,20 +20,57 @@ Same stack as gtme.school: static HTML, one CSS file, vanilla JS, no build step.
 ```bash
 npm run dev          # http://localhost:3000/vsl and /corporate-vsl
 npm test             # unit tests for /api/apply
+npm run migrate      # apply supabase/migrations/*.sql (needs POSTGRES_URL)
 ```
+
+To exercise the real database locally, pull the project's variables first
+(`vercel env pull .env.local`) and start the dev server with them loaded.
 
 Add `?debug=1` to any page URL to log every tracking event to the console (also stored in `window.__gtmeEvents`).
 
 ## Deploy (Vercel)
 
 1. Import this repository into Vercel. Framework preset: **Other**. No build command, no output directory.
-2. Set environment variables (Project → Settings → Environment Variables):
-   - `APPLY_WEBHOOK_URL` — **required**. Where applications go (Zapier / Make / n8n / CRM / Slack webhook).
-   - `CORPORATE_WEBHOOK_URL` — optional. Separate destination for corporate enquiries.
-   - `APPLY_WEBHOOK_SECRET` — optional. Sent as `X-GTME-Secret` so the receiver can reject forged posts.
-3. Point a domain at it (for example `apply.gtme.school`), or a path on gtme.school via rewrites.
+2. Connect a Supabase database: Project → Storage → Supabase. The integration sets
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and the `POSTGRES_*` variables itself; that is all
+   `/api/apply` needs in order to store applications. See **Where applications are stored** below.
+3. Optional environment variables:
+   - `APPLY_WEBHOOK_URL` — also push each application to Zapier / Make / n8n / a CRM / Slack.
+   - `CORPORATE_WEBHOOK_URL` — separate destination for corporate enquiries.
+   - `APPLY_WEBHOOK_SECRET` — sent as `X-GTME-Secret` so the receiver can reject forged posts.
+4. Point a domain at it (for example `apply.gtme.school`), or a path on gtme.school via rewrites.
 
-Until `APPLY_WEBHOOK_URL` is set, `/api/apply` returns 503 and the form falls back to opening a pre-filled email to hello@gtme.school (the same behaviour as gtme.school's forms today). No `Lead` event fires in that case.
+If **neither** Supabase nor a webhook is configured, `/api/apply` returns 503 and the form falls
+back to opening a pre-filled email to hello@gtme.school. No `Lead` event fires in that case.
+
+## Where applications are stored
+
+Every submission is written to Supabase by `/api/apply` using the service-role key, which stays on
+the server. Two tables, created by `supabase/migrations/0001_applications.sql`:
+
+| Table | What's in it |
+|---|---|
+| `applications` | One row per applicant, keyed on `lead_id`. Step 1, the full application and the booked call all update the same row, so a row reads as the whole story: name, email, phone, the six answers, `qualified`, UTM tags, and `contact_at` / `applied_at` / `booked_at`. |
+| `application_events` | Append-only log of every accepted POST, with the full payload in `payload` (jsonb). Never updated or deleted, so nothing is ever lost if an answer changes. |
+
+There is also an `applications_overview` view with just the columns you want when reading the
+funnel in the dashboard.
+
+Row Level Security is enabled on both tables with **no policies**, so the publishable/anon key the
+browser holds cannot read or write them — only the serverless function and the Supabase dashboard
+can. Don't add an `anon` policy.
+
+To read the data: Supabase dashboard → Table Editor → `applications` (or SQL Editor, e.g.
+`select * from applications_overview limit 50;`).
+
+### Migrations
+
+`npm run build` (which is what Vercel runs, see `buildCommand` in `vercel.json`) applies every file
+in `supabase/migrations/` using the Postgres credentials the Supabase integration installed, so the
+tables exist before a deployment goes live. The SQL is idempotent, so it is a no-op on later
+deploys. It never fails the build — if the database is unreachable the page still ships and the
+build log says `[migrate] …`. To apply by hand instead, paste the migration into the Supabase SQL
+editor, or run `POSTGRES_URL='postgresql://…' npm run migrate` locally.
 
 ## Configure — `assets/js/config.js`
 
@@ -86,7 +123,10 @@ assets/js/config.js            all configuration
 assets/js/track.js             tracking hooks (GTMETrack.event)
 assets/js/vsl.js               video, testimonials, proof slots, form, qualification, Calendly, FAQ
 assets/js/motion.js            v2 motion only: scroll progress, counters, sticky engine, live-build demo, tabs, rails, calculator
-api/apply.js                   serverless form handler (validation, honeypot, webhook forwarding)
+api/apply.js                   serverless form handler (validation, honeypot, Supabase, webhook forwarding)
+api/_supabase.js               writes each submission to the applications / application_events tables
+supabase/migrations/*.sql      the schema, applied at build time by scripts/migrate.js
+scripts/migrate.js             applies the migrations (Vercel buildCommand, or `npm run migrate`)
 scripts/dev.js                 local server that mirrors vercel.json
 tests/apply.test.js            handler tests
 ```
@@ -98,7 +138,6 @@ See the checklist in the pull request / hand-off notes. In short: the edited VSL
 ## v2 design notes
 
 - Motion respects `prefers-reduced-motion` and every section still reads without JavaScript.
-- The countdown in the top notice reads `data-deadline` on `vsl.html` and hides itself once the date passes.
 - Market figures (63 → 3,342 postings, +5,205%, ~70% mention Clay, 71% use AI tools) come from Nish's YouTube research slides. Confirm the original sources before running ads.
 - Result numbers (24.8K sent, 2.3% reply, 183 opportunities; 23.5K / 81; 549 / 37 / 25) are read from the dashboard screenshots in `assets/img`.
 
@@ -114,9 +153,9 @@ See the checklist in the pull request / hand-off notes. In short: the edited VSL
 - **Qualification** lives in `funnels.individual.qualification` in `config.js`. By default anyone answering "Not right now" to the investment question goes to the course offer, and "Yes" or "Need a payment plan" goes to the calendar.
 - **Settings to fill in** (`config.js`): `bookingUrl` (a Cal.com or Calendly link), `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
 
-### Stages sent to the webhook (for a CRM)
+### Stages (for Supabase and the optional CRM webhook)
 
-Every request carries the same `lead_id`, so Zapier / Make / n8n can upsert one record and move it through a pipeline:
+Every request carries the same `lead_id`, so one `applications` row — and any Zapier / Make / n8n automation — moves through the pipeline instead of collecting duplicates:
 
 | `stage` | `lead_stage` | When |
 |---|---|---|
