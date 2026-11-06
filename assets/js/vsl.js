@@ -43,7 +43,12 @@
   $$('[data-vsl]').forEach(function (box) {
     var src = F.videoSrc || '', poster = F.videoPoster || '';
     var btn = $('.vsl-play', box);
-    if (!src) { box.classList.add('is-empty'); return; } // the labelled placeholder stays visible
+    if (!src) {
+      // No video configured yet: hide the whole player instead of showing an unfinished placeholder.
+      box.classList.add('is-empty');
+      var wrap = box.closest('.stage-wrap'); if (wrap) { wrap.hidden = true; var h = box.closest('.hero'); if (h) h.classList.add('no-vsl'); }
+      return;
+    }
     if (poster) { var img = $('.vsl-poster', box); if (img) { img.src = poster; img.hidden = false; } }
     var marks = { 25: 0, 50: 0, 75: 0, 100: 0 };
     function start() {
@@ -85,13 +90,23 @@
   var proof = CFG.proof || {};
   $$('[data-proof]').forEach(function (slot) {
     var kind = slot.getAttribute('data-proof'), items = proof[kind] || [];
-    if (!items.length) return; // keep the labelled placeholder
+    if (!items.length) return; // nothing verified yet: the slot stays hidden
     var html = '';
     if (kind === 'studentScreenshots') html = items.map(function (i) { return '<figure class="shot"><button type="button" class="zoom" data-zoom="' + esc(i.src) + '" data-cap="' + esc(i.caption || i.alt) + '"><img src="' + esc(i.src) + '" alt="' + esc(i.alt || '') + '" loading="lazy" decoding="async"></button>' + (i.caption ? '<figcaption>' + esc(i.caption) + '</figcaption>' : '') + '</figure>'; }).join('');
     if (kind === 'linkedinRecommendations' || kind === 'corporateTestimonials') html = items.map(function (i) { return '<blockquote class="rec"><p>' + esc(i.quote) + '</p><footer><b>' + esc(i.name) + '</b><span>' + esc(i.role || '') + '</span>' + (i.url ? '<a href="' + esc(i.url) + '" target="_blank" rel="noopener">View on LinkedIn ↗</a>' : '') + '</footer></blockquote>'; }).join('');
     if (kind === 'verifiedStats') html = items.map(function (i) { return '<div class="stat"><b>' + esc(i.value) + '</b><span>' + esc(i.label) + '</span></div>'; }).join('');
-    slot.innerHTML = html; slot.classList.remove('ph-slot'); slot.classList.add('filled');
+    slot.innerHTML = html; slot.classList.remove('ph-slot'); slot.classList.add('filled'); slot.hidden = false;
     bindZoom(slot);
+  });
+
+  // Hide the proof wrapper unless at least one slot was filled from config.
+  $$('[data-proofs]').forEach(function (p) { p.hidden = !$('.filled', p); });
+
+  /* ------------------------------------------------------------------ curriculum download (only when a real file is configured) */
+  $$('[data-curriculum]').forEach(function (a) {
+    if (!F.curriculumUrl) return; // stays hidden
+    a.href = F.curriculumUrl; a.hidden = false;
+    a.addEventListener('click', function () { track('CurriculumDownload', { content_category: FUNNEL }); });
   });
 
   /* ------------------------------------------------------------------ lightbox */

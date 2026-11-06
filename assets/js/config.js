@@ -41,6 +41,10 @@ window.GTME_CONFIG = {
       videoSrc: '',
       videoPoster: '',
 
+      // Curriculum PDF. When set, a "Download the curriculum" link appears under the curriculum section.
+      // Leave empty until the real document exists, e.g. '/assets/docs/gtme-curriculum.pdf'.
+      curriculumUrl: '',
+
       // Call booking for qualified applicants, shown on /apply/qualified.
       // A Cal.com link or a Calendly link both work.
       bookingUrl: 'https://cal.com/shrinishkarsh/gtme-school',
@@ -93,7 +97,7 @@ window.GTME_CONFIG = {
   },
 
   // Social proof that still has to be supplied by the team. Add items here and they render
-  // automatically; while a list is empty, a clearly labelled placeholder card is shown instead.
+  // automatically; while a list is empty, nothing is shown (no placeholder cards on the page).
   proof: {
     // { src: '/assets/img/student-1.jpg', alt: '...', caption: '...' }
     studentScreenshots: [],
