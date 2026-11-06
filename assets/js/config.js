@@ -38,8 +38,8 @@ window.GTME_CONFIG = {
     /* ---------------- Individual VSL (/vsl) ---------------- */
     individual: {
       // VSL video. Either an .mp4 URL, or a YouTube / Vimeo / Wistia / Loom embed URL.
-      videoSrc: '',
-      videoPoster: '',
+      videoSrc: 'https://youtu.be/1UnC8iKCVv8',
+      videoPoster: 'https://i.ytimg.com/vi/1UnC8iKCVv8/hqdefault.jpg',
 
       // Curriculum PDF. When set, a "Download the curriculum" link appears under the curriculum section.
       // Leave empty until the real document exists, e.g. '/assets/docs/gtme-curriculum.pdf'.
