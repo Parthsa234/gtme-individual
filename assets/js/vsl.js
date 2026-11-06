@@ -43,12 +43,7 @@
   $$('[data-vsl]').forEach(function (box) {
     var src = F.videoSrc || '', poster = F.videoPoster || '';
     var btn = $('.vsl-play', box);
-    if (!src) {
-      // No video configured yet: hide the whole player instead of showing an unfinished placeholder.
-      box.classList.add('is-empty');
-      var wrap = box.closest('.stage-wrap'); if (wrap) { wrap.hidden = true; var h = box.closest('.hero'); if (h) h.classList.add('no-vsl'); }
-      return;
-    }
+    if (!src) { box.classList.add('is-empty'); return; } // keep the full-width "Video coming soon" frame until a video is set
     if (poster) { var img = $('.vsl-poster', box); if (img) { img.src = poster; img.hidden = false; } }
     var marks = { 25: 0, 50: 0, 75: 0, 100: 0 };
     function start() {

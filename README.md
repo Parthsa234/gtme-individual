@@ -157,7 +157,7 @@ Removed: the Problem (before/after) section, the Opportunity orbit, the sticky "
 live-build simulation, the "Your path" post-application timeline, the Principal / Lieutenant tracks,
 the "Who it's for" tabs, the quote rotator and the dashed proof placeholders.
 
-- If `funnels.individual.videoSrc` is empty, the hero hides the player instead of showing a placeholder.
+- The VSL frame spans the full content width. Until `funnels.individual.videoSrc` is set it shows "Video coming soon".
 - `funnels.individual.curriculumUrl` (new) shows a "Download the curriculum" link only once a real file is set.
 - `proof.*` items render under the testimonials only when filled; nothing shows while they are empty.
 
