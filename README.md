@@ -147,6 +147,20 @@ See the checklist in the pull request / hand-off notes. In short: the edited VSL
 - Market figures (63 → 3,342 postings, +5,205%, ~70% mention Clay, 71% use AI tools) come from Nish's YouTube research slides. Confirm the original sources before running ads.
 - Result numbers (24.8K sent, 2.3% reply, 183 opportunities; 23.5K / 81; 549 / 37 / 25) are read from the dashboard screenshots in `assets/img`.
 
+## Individual page v2.3: changes from the Nov 6 founder / marketing review
+
+Section order on `/vsl`: hero (Apply CTA → `#apply`) · GTM engineering intro · the program in brief ·
+student testimonials · **application form** · campaign work samples · market demand · curriculum (the
+six machines, shown once, as expandable modules) · founder · investment (one program, $4,000) · FAQ · final CTA.
+
+Removed: the Problem (before/after) section, the Opportunity orbit, the sticky "engine" animation, the
+live-build simulation, the "Your path" post-application timeline, the Principal / Lieutenant tracks,
+the "Who it's for" tabs, the quote rotator and the dashed proof placeholders.
+
+- The VSL frame spans the full content width. Until `funnels.individual.videoSrc` is set it shows "Video coming soon".
+- `funnels.individual.curriculumUrl` (new) shows a "Download the curriculum" link only once a real file is set.
+- `proof.*` items render under the testimonials only when filled; nothing shows while they are empty.
+
 ## Individual funnel v2.2: multi-step application and routing
 
 ```
