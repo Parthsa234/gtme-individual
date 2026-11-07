@@ -130,6 +130,8 @@ assets/js/motion.js            v2 motion only: scroll progress, counters, sticky
 api/apply.js                   serverless form handler (validation, honeypot, Supabase, webhook forwarding)
 api/_supabase.js               writes each submission to the applications / application_events tables
 api/_schema.js                 the schema both migration paths apply
+api/book.js                    GET /book: personalised Cal.com link, reads the lead from Supabase
+api/_booking.js                signs booking links, normalises phones, builds the prefilled Cal.com URL
 api/migrate.js                 one-time, DB_SETUP_TOKEN-guarded route that creates the tables
 supabase/migrations/*.sql      the same schema, to paste into the Supabase SQL editor
 scripts/migrate.js             applies the schema from a connection string (`npm run migrate`)
@@ -173,6 +175,39 @@ the "Who it's for" tabs, the quote rotator and the dashed proof placeholders.
 - **Qualification** lives in `funnels.individual.qualification` in `config.js`. By default anyone answering "Not right now" to the investment question goes to the course offer, and "Yes" or "Need a payment plan" goes to the calendar.
 - **Booking** is `funnels.individual.bookingUrl` in `config.js`, set to `https://cal.com/shrinishkarsh/gtme-school`. It is embedded inline on `/apply/qualified` with the applicant's name and email prefilled, and a confirmed booking posts `stage: "call_booked"` back to `/api/apply`. Change the link there and the embed and its namespace follow.
 - **Still to fill in** (`config.js`): `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
+
+### Personalised booking links (Supabase → Cal.com)
+
+Every individual lead who finished step 1, or who qualified, gets a personalised booking link:
+
+```
+https://gtme-individual.vercel.app/book?lead=<lead_id>&sig=<signature>
+```
+
+- `/api/apply` creates it and returns it as `booking_link` in its response and in the
+  `APPLY_WEBHOOK_URL` payload, so Zapier / Make / n8n can email or WhatsApp it, for example to
+  people who left the form after step 1. Not-qualified applicants and corporate enquiries get no link.
+- When someone opens it, `/api/book` checks the signature, reads that lead's row from Supabase
+  (`applications`, by `lead_id`) and redirects to the Cal.com event with **name, email and phone
+  prefilled** and `metadata[lead_id]` attached to the booking. The lead only picks a slot and confirms.
+  Nothing is booked automatically.
+- The link contains no personal data, and the signature stops anyone from guessing other leads' links.
+- Already booked → `/apply/booked`. Marked not qualified → `/apply/not-a-fit`. Row missing or
+  Supabase unreachable → the plain Cal.com event, so a real lead can still book.
+- The calendar embedded on `/apply/qualified` now also prefills the phone and the lead_id.
+
+Phone prefill needs the event's phone question switched on (Cal.com → event → Advanced → Booking
+questions → "Phone number", identifier `attendeePhoneNumber`). Cal.com only accepts E.164, so numbers
+are normalised (`+91 98765 43210` → `+919876543210`; a bare 10-digit number is assumed to be Indian)
+and left out when they can't be normalised safely.
+
+| Variable | |
+|---|---|
+| `BOOKING_LINK_SECRET` | **Required.** At least 16 random characters. Without it no links are issued and `/book` answers 404. |
+| `CAL_BOOKING_URL` | The event to book, e.g. the simplified copy. Default `https://cal.com/shrinishkarsh/gtme-school`. Keep it the same as `bookingUrl` in `config.js`. |
+| `CAL_PHONE_FIELD` | Phone question identifier. Default `attendeePhoneNumber`; `none` turns phone prefill off. Keep it the same as `bookingPhoneField` in `config.js`. |
+| `DEFAULT_PHONE_COUNTRY_CODE` | For bare 10-digit numbers. Default `91`. |
+| `PUBLIC_SITE_URL` | Origin used in links. Default: the host the form was submitted to. |
 
 ### Stages (for Supabase and the optional CRM webhook)
 

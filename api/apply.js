@@ -22,6 +22,7 @@
 'use strict';
 
 const store = require('./_supabase.js');
+const booking = require('./_booking.js');
 
 const LIMITS = { full_name: 120, email: 160, work_email: 160, phone: 30, company: 160, role: 80, experience: 40, hours: 40,
   investment: 120, why: 1500, goals: 1500, team_size: 40, motion: 80, timeline: 40,
@@ -96,7 +97,10 @@ async function handler(req, res) {
     submitted_at: new Date().toISOString(),
     user_agent: String(req.headers['user-agent'] || '').slice(0, 300)
   };
-  const payload = Object.assign({}, v.data, meta);
+  // Pin the lead_id now so the database row, the webhook and the booking link all agree on it.
+  if (!v.data.lead_id) v.data.lead_id = store.fallbackLeadId(v.data);
+  const bookingLink = bookingLinkFor(v.data, req);
+  const payload = Object.assign({}, v.data, meta, bookingLink ? { booking_link: bookingLink } : {});
 
   const [saved, forwarded] = await Promise.all([
     toDatabase ? store.save(v.data, meta) : Promise.resolve(null),
@@ -117,8 +121,28 @@ async function handler(req, res) {
     stage: v.data.stage,
     qualified: v.data.qualified,
     lead_id: (saved && saved.lead_id) || v.data.lead_id || undefined,
-    stored: Boolean(saved && saved.ok)
+    stored: Boolean(saved && saved.ok),
+    booking_link: bookingLink || undefined
   });
+}
+
+/*
+ * The personalised booking link (/book?lead=…&sig=…) for individual leads who may book a call:
+ * everyone who finished step 1 (so abandoned applications can be sent the link) and everyone who
+ * qualified. Not-qualified applicants and corporate enquiries get none. The link holds no personal
+ * data; /api/book reads the lead from Supabase when it is opened. Empty when BOOKING_LINK_SECRET
+ * is not set.
+ */
+function bookingLinkFor(data, req) {
+  if (data.funnel !== 'individual') return '';
+  if (!(data.stage === 'contact' || (data.stage === 'application' && data.qualified))) return '';
+  return booking.signedLink(data.lead_id, siteOrigin(req));
+}
+
+function siteOrigin(req) {
+  if (process.env.PUBLIC_SITE_URL) return process.env.PUBLIC_SITE_URL;
+  const h = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || '';
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(h) ? ((/^(localhost|127\.)/.test(h) ? 'http://' : 'https://') + h) : '';
 }
 
 /** Best-effort POST to the team's webhook. Never throws. */

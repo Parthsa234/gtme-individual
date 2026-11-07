@@ -21,6 +21,10 @@
     {
       "source": "/apply/booked",
       "destination": "/apply-booked.html"
+    },
+    {
+      "source": "/book",
+      "destination": "/api/book"
     }
   ],
   "headers": [

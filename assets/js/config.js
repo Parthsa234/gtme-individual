@@ -50,6 +50,10 @@ window.GTME_CONFIG = {
       bookingUrl: 'https://cal.com/shrinishkarsh/gtme-school',
       // Cal.com embed namespace. Defaults to the event slug from bookingUrl ('gtme-school').
       bookingNamespace: 'gtme-school',
+      // Identifier of the phone question on the Cal.com event, used to prefill the applicant's number.
+      // 'attendeePhoneNumber' is Cal.com's built-in phone field (switch it on under the event's
+      // Advanced → Booking questions). Set '' to stop prefilling the phone.
+      bookingPhoneField: 'attendeePhoneNumber',
       calendlyUrl: '', // older setting, still read if bookingUrl is empty
 
       // Where each applicant goes after the multi-step form.

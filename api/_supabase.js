@@ -121,4 +121,34 @@ async function save(data, meta) {
   return { ok: true, lead_id: row.lead_id };
 }
 
-module.exports = { isConfigured, save, toRow };
+/**
+ * Read one applicant by lead_id, for the personalised booking link (/api/book).
+ * Selects only the columns the link needs. Returns { ok, lead } where lead is null when no row
+ * matches, or { ok:false, status, error } when Supabase could not be read.
+ */
+async function getLead(leadId) {
+  if (!isConfigured()) return { ok: false, error: 'not_configured' };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const path = 'applications?select=lead_id,funnel,full_name,email,phone,qualified,lead_stage,booked_at' +
+    '&lead_id=eq.' + encodeURIComponent(leadId) + '&limit=1';
+  try {
+    const r = await fetch(baseUrl() + '/rest/v1/' + path, {
+      method: 'GET',
+      headers: { apikey: serviceKey(), Authorization: 'Bearer ' + serviceKey(), Accept: 'application/json' },
+      signal: ctrl.signal
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(function () { return ''; });
+      return { ok: false, status: r.status, error: String(detail).slice(0, 400) };
+    }
+    const rows = await r.json();
+    return { ok: true, lead: Array.isArray(rows) && rows.length ? rows[0] : null };
+  } catch (e) {
+    return { ok: false, status: 0, error: (e && e.message) || 'request failed' };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+module.exports = { isConfigured, save, toRow, getLead, fallbackLeadId };

@@ -214,6 +214,17 @@
     }
   }
 
+  /* Same rules as api/_booking.js toE164: '' whenever the number can't be normalised safely. */
+  function toE164(raw) {
+    var s = String(raw || '').trim(); if (!s) return '';
+    var digits = s.replace(/\D/g, '');
+    if (s.charAt(0) === '+') return digits.length >= 8 && digits.length <= 15 ? '+' + digits : '';
+    if (digits.indexOf('00') === 0) digits = digits.slice(2);
+    else if (digits.length === 11 && digits.charAt(0) === '0') digits = digits.slice(1);
+    if (digits.length === 10) return '+91' + digits;
+    return digits.length >= 11 && digits.length <= 15 ? '+' + digits : '';
+  }
+
   /* ---------------------------------------------------------------- booking embed */
   function mountBooking() {
     var box = $('[data-booking]'); if (!box) return;
@@ -265,6 +276,12 @@
       var conf = { layout: 'month_view', useSlotsViewOnSmallScreen: 'true', theme: 'light' };
       if (me.full_name) conf.name = me.full_name;
       if (me.email) conf.email = me.email;
+      // Phone: Cal.com phone fields only accept E.164 (+919876543210). The field identifier is
+      // bookingPhoneField in config.js; '' turns phone prefill off.
+      var phoneField = F.bookingPhoneField === undefined ? 'attendeePhoneNumber' : F.bookingPhoneField;
+      var e164 = toE164(me.phone);
+      if (phoneField && e164) conf[phoneField] = e164;
+      if (me.lead_id) conf['metadata[lead_id]'] = me.lead_id; // ties the Cal.com booking to the Supabase row
       cal('inline', { elementOrSelector: '#cal-inline', calLink: calLink, config: conf });
       cal('ui', { hideEventTypeDetails: false, layout: 'month_view' });
       cal('on', { action: 'linkReady', callback: function () { track('BookingView', { content_category: 'individual' }); } });
