@@ -173,7 +173,7 @@ the "Who it's for" tabs, the quote rotator and the dashed proof placeholders.
 - **Step 1** asks for name, email and phone/WhatsApp, and is POSTed to `/api/apply` as `stage: "contact"` the moment the person clicks Continue, so abandoned forms can be followed up.
 - **Steps 2–7** are one-click questions (also keyboard A–F): which best describes you, the goal in 6 months, what you've tried so far, 6–10 hours a week, the $4,000 investment and when you want to start.
 - **Qualification** lives in `funnels.individual.qualification` in `config.js`. By default anyone answering "Not right now" to the investment question goes to the course offer, and "Yes" or "Need a payment plan" goes to the calendar.
-- **Booking** is `funnels.individual.bookingUrl` in `config.js`, set to `https://cal.com/shrinishkarsh/gtme-school`. It is embedded inline on `/apply/qualified` with the applicant's name and email prefilled, and a confirmed booking posts `stage: "call_booked"` back to `/api/apply`. Change the link there and the embed and its namespace follow.
+- **Booking** is `funnels.individual.bookingUrl` in `config.js`, set to `https://cal.com/shrinishkarsh/gtme-school-copy` (a simplified copy of the original `gtme-school` event, which is left unchanged). It is embedded inline on `/apply/qualified` with the applicant's name and email prefilled, and a confirmed booking posts `stage: "call_booked"` back to `/api/apply`. Change the link there and the embed and its namespace follow.
 - **Still to fill in** (`config.js`): `downsell.url` (checkout for the ₹999 course; until it's set the button opens an email), `prepVideoSrc` (optional video on the booked page).
 
 ### Personalised booking links (Supabase → Cal.com)
@@ -204,7 +204,7 @@ and left out when they can't be normalised safely.
 | Variable | |
 |---|---|
 | `BOOKING_LINK_SECRET` | **Required.** At least 16 random characters. Without it no links are issued and `/book` answers 404. |
-| `CAL_BOOKING_URL` | The event to book, e.g. the simplified copy. Default `https://cal.com/shrinishkarsh/gtme-school`. Keep it the same as `bookingUrl` in `config.js`. |
+| `CAL_BOOKING_URL` | The event to book, e.g. the simplified copy. Default `https://cal.com/shrinishkarsh/gtme-school-copy` (the simplified copy). Keep it the same as `bookingUrl` in `config.js`. |
 | `CAL_PHONE_FIELD` | Phone question identifier. Default `attendeePhoneNumber`; `none` turns phone prefill off. Keep it the same as `bookingPhoneField` in `config.js`. |
 | `DEFAULT_PHONE_COUNTRY_CODE` | For bare 10-digit numbers. Default `91`. |
 | `PUBLIC_SITE_URL` | Origin used in links. Default: the host the form was submitted to. |

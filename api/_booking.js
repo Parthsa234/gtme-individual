@@ -17,7 +17,7 @@
  * Environment variables:
  *   BOOKING_LINK_SECRET          required for signed links. Any long random string. Without it,
  *                                /book answers 404 and no links are issued.
- *   CAL_BOOKING_URL              the event to book. Default: the current GTME.School event.
+ *   CAL_BOOKING_URL              the event to book. Default: the simplified copy, shrinishkarsh/gtme-school-copy.
  *   CAL_PHONE_FIELD              phone field identifier on that event. Default attendeePhoneNumber.
  *                                Set to "none" to never prefill the phone.
  *   DEFAULT_PHONE_COUNTRY_CODE   used only for a bare 10-digit number typed without a country
@@ -29,7 +29,7 @@
 
 const crypto = require('crypto');
 
-const DEFAULT_CAL_URL = 'https://cal.com/shrinishkarsh/gtme-school';
+const DEFAULT_CAL_URL = 'https://cal.com/shrinishkarsh/gtme-school-copy'; // simplified copy of the GTME.School event
 const DEFAULT_SITE = 'https://gtme-individual.vercel.app';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 

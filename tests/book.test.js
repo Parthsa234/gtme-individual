@@ -67,9 +67,9 @@ test('calUrl uses a custom phone field, can turn phone off, and drops an invalid
   assert.equal(u.searchParams.has('email'), false);
   assert.equal(u.searchParams.get('name'), 'Test Person');
 });
-test('calUrl defaults to the existing GTME.School event when CAL_BOOKING_URL is unset', () => {
+test('calUrl defaults to the simplified gtme-school-copy event when CAL_BOOKING_URL is unset', () => {
   env();
-  assert.match(booking.calUrl(LEAD), /^https:\/\/cal\.com\/shrinishkarsh\/gtme-school\?/);
+  assert.match(booking.calUrl(LEAD), /^https:\/\/cal\.com\/shrinishkarsh\/gtme-school-copy\?/);
 });
 
 /* ---------------------------------------------------------------- signing */

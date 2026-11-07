@@ -47,9 +47,9 @@ window.GTME_CONFIG = {
 
       // Call booking for qualified applicants, shown on /apply/qualified.
       // A Cal.com link or a Calendly link both work.
-      bookingUrl: 'https://cal.com/shrinishkarsh/gtme-school',
-      // Cal.com embed namespace. Defaults to the event slug from bookingUrl ('gtme-school').
-      bookingNamespace: 'gtme-school',
+      bookingUrl: 'https://cal.com/shrinishkarsh/gtme-school-copy',
+      // Cal.com embed namespace. Defaults to the event slug from bookingUrl ('gtme-school-copy').
+      bookingNamespace: 'gtme-school-copy',
       // Identifier of the phone question on the Cal.com event, used to prefill the applicant's number.
       // 'attendeePhoneNumber' is Cal.com's built-in phone field (switch it on under the event's
       // Advanced → Booking questions). Set '' to stop prefilling the phone.
