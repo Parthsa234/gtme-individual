@@ -14,7 +14,9 @@ window.GTME_CONFIG = {
   debug: false,
 
   tracking: {
-    gtmId: '',              // e.g. 'GTM-XXXXXXX'
+    // GTM container GTM-NPFX54H8 is installed directly in each page's <head> (and <noscript> after <body>).
+    // Keep this empty, or the container would load twice.
+    gtmId: '',
     metaPixelId: '',        // e.g. '123456789012345'
     googleAds: {
       id: '',               // e.g. 'AW-123456789'. Leave empty if Google Ads conversions run through GTM.
