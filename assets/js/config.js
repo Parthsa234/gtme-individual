@@ -14,7 +14,7 @@ window.GTME_CONFIG = {
   debug: false,
 
   tracking: {
-    // GTM container GTM-NPFX54H8 is installed directly in each page's <head> (and <noscript> after <body>).
+    // GTM container GTM-NPFX54H8 is installed directly in vsl.html's <head> (and <noscript> after <body>).
     // Keep this empty, or the container would load twice.
     gtmId: '',
     metaPixelId: '',        // e.g. '123456789012345'
