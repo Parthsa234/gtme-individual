@@ -200,8 +200,10 @@ form (/vsl) ──▶ /api/apply ──▶ Supabase row (answers + utm_source/me
 ```
 
 - **No repeated questions.** The `gtme-school` event asks nothing the form already asked: name and
-  email are prefilled from the application and locked (Cal.com requires both, so they can't be
-  removed), and the phone question is hidden. Only the optional notes and guests fields remain.
+  email are prefilled from the application (Cal.com requires both, so they can't be removed), and
+  the phone question is hidden. The name is locked; the email stays editable because Cal.com refuses
+  addresses that can't receive mail, and an applicant with a typo must be able to fix it. Only the
+  optional notes and guests fields remain.
 - **Booking → row.** Either path writes `cal_booking_id`, `cal_booking_uid`, `booking_start`,
   `booking_end`, `booking_status` (accepted / pending / cancelled / rejected) and `lead_stage` onto the
   applicant's row. The webhook is the reliable one: it works even if the applicant closes the tab

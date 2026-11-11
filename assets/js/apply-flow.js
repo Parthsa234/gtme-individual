@@ -286,8 +286,10 @@
       var cal = w.Cal.ns[ns];
       // theme is pinned light because the booking section of the page is light in both schemes
       var conf = { layout: 'month_view', useSlotsViewOnSmallScreen: 'true', theme: 'light' };
-      // Name and email come from the application, so the applicant doesn't type them again (the
-      // Cal.com event locks prefilled values). Every other question on the event is switched off.
+      // Name and email come from the application, so the applicant doesn't type them again. On the
+      // Cal.com event the name is locked once prefilled; the email stays editable because Cal.com
+      // refuses addresses that can't receive mail, and a typo must be fixable here. Every other
+      // question on the event is switched off.
       if (me.full_name) conf.name = me.full_name;
       if (me.email) conf.email = me.email;
       // Ties the Cal.com booking to the Supabase row, and carries the landing-page UTM tags onto the
