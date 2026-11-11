@@ -33,6 +33,15 @@
     body.funnel = 'individual'; body.page = w.location.pathname; body.attribution = attribution();
     return fetch(CFG.formEndpoint || '/api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: !!keepalive });
   }
+  /* The server may merge this submission onto an earlier application from the same email (another
+     device or tab) and answer with that row's lead_id. Adopt it, so the booking is tied to the row. */
+  function adopt(r, state) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (j && typeof j.lead_id === 'string' && j.lead_id && j.lead_id !== state.lead_id) { state.lead_id = j.lead_id; save(state); }
+      return j;
+    });
+  }
+  var UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
   function go(url) { setTimeout(function () { w.location.href = url; }, 450); } // a moment for pixels to send
   function qualifies(o) {
     var rules = (F.qualification && F.qualification.disqualifyIf) || [];
@@ -102,7 +111,7 @@
       if (form.elements.website && form.elements.website.value) return true; // honeypot: carry on, send nothing
       // Save the contact now, without making the applicant wait for it.
       post({ stage: 'contact', lead_id: state.lead_id, full_name: state.full_name, email: state.email, phone: state.phone, consent: state.consent }, true)
-        .then(function (r) { if (r.ok) { state.contact_saved = true; save(state); track('Lead', { stage: 'contact' }, { persist: true, key: emailKey(state.email) }); } })
+        .then(function (r) { if (r.ok) { state.contact_saved = true; save(state); track('Lead', { stage: 'contact' }, { persist: true, key: emailKey(state.email) }); return adopt(r, state); } })
         .catch(function () {});
       return true;
     }
@@ -162,7 +171,8 @@
           track('SubmitApplication', { qualified: o.qualified }, { persist: true, key: emailKey(o.email) });
           if (!state.contact_saved) track('Lead', { stage: 'application' }, { persist: true, key: emailKey(o.email) });
           state.submitted = true; save(state);
-          box.classList.add('routing'); go(dest); return;
+          box.classList.add('routing');
+          return adopt(r, state).then(function () { go(dest); });
         }
         if ((r.status === 404 || r.status === 405 || r.status === 501 || r.status === 503) && CFG.mailtoFallback) return fallback(o, dest);
         return r.json().catch(function () { return {}; }).then(function (j) { setBusy(false); err.textContent = (j && j.message) || 'Something went wrong sending your application. Please try again in a moment.'; err.hidden = false; });
@@ -219,12 +229,24 @@
     var box = $('[data-booking]'); if (!box) return;
     var link = F.bookingUrl || F.calendlyUrl || '';
     if (!link) return; // the labelled placeholder stays
+    // Already booked in this session (back button, refresh): don't offer a second booking.
+    if (me.booked) { var msg = $('[data-booked-msg]'); if (msg) msg.hidden = false; go(ROUTES.booked); return; }
+    var attr = attribution();
     var booked = false;
+    /* Report the booking to /api/apply, which confirms it with the Cal.com API before storing it.
+       One retry on a network error. The Cal.com webhook records the booking independently, so a
+       closed tab or a failed report never loses it. */
+    function report(info, attempt) {
+      if (!me.email) return;
+      post({ stage: 'call_booked', lead_id: me.lead_id, email: me.email, full_name: me.full_name, booking_time: (info && info.time) || '', booking_ref: (info && info.ref) || '' }, true)
+        .then(function (r) { if (!r.ok && r.status >= 500 && attempt < 1) setTimeout(function () { report(info, attempt + 1); }, 1500); })
+        .catch(function () { if (attempt < 1) setTimeout(function () { report(info, attempt + 1); }, 1500); });
+    }
     function onBooked(info) {
       if (booked) return; booked = true;
       track('Schedule', { content_category: 'individual' }, { persist: true, key: me.lead_id || 'direct' });
-      if (me.email) post({ stage: 'call_booked', lead_id: me.lead_id, email: me.email, full_name: me.full_name, booking_time: (info && info.time) || '', booking_ref: (info && info.ref) || '' }, true).catch(function () {});
-      me.booked = true; save(me);
+      report(info, 0);
+      me.booked = true; me.booking_uid = (info && info.ref) || ''; save(me);
       var ok = $('[data-booked-msg]'); if (ok) ok.hidden = false;
       go(ROUTES.booked);
     }
@@ -234,6 +256,7 @@
     if (/calendly\.com$/.test(u.hostname)) {
       if (me.full_name) u.searchParams.set('name', me.full_name);
       if (me.email) u.searchParams.set('email', me.email);
+      UTM.forEach(function (k) { if (attr[k]) u.searchParams.set(k, attr[k]); });
       u.searchParams.set('hide_gdpr_banner', '1');
       box.innerHTML = '<div class="calendly-inline-widget" data-url="' + u.toString().replace(/"/g, '&quot;') + '" style="min-width:300px;height:760px"></div>';
       var s = d.createElement('script'); s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true; d.body.appendChild(s);
@@ -263,11 +286,28 @@
       var cal = w.Cal.ns[ns];
       // theme is pinned light because the booking section of the page is light in both schemes
       var conf = { layout: 'month_view', useSlotsViewOnSmallScreen: 'true', theme: 'light' };
+      // Name and email come from the application, so the applicant doesn't type them again (the
+      // Cal.com event locks prefilled values). Every other question on the event is switched off.
       if (me.full_name) conf.name = me.full_name;
       if (me.email) conf.email = me.email;
+      // Ties the Cal.com booking to the Supabase row, and carries the landing-page UTM tags onto the
+      // booking: as metadata (stored on the booking, read back by /api/cal-webhook) and as plain
+      // utm_* parameters (Cal.com's own booking tracking).
+      if (me.lead_id) conf['metadata[lead_id]'] = me.lead_id;
+      UTM.forEach(function (k) { if (attr[k]) { conf['metadata[' + k + ']'] = attr[k]; conf[k] = attr[k]; } });
       cal('inline', { elementOrSelector: '#cal-inline', calLink: calLink, config: conf });
       cal('ui', { hideEventTypeDetails: false, layout: 'month_view' });
       cal('on', { action: 'linkReady', callback: function () { track('BookingView', { content_category: 'individual' }); } });
+      // The calendar failed to load (Cal.com down, blocked by an extension): offer the direct link.
+      cal('on', { action: 'linkFailed', callback: function () {
+        track('BookingLoadFailed', { content_category: 'individual' });
+        var direct = new URL(link);
+        if (me.full_name) direct.searchParams.set('name', me.full_name);
+        if (me.email) direct.searchParams.set('email', me.email);
+        if (me.lead_id) direct.searchParams.set('metadata[lead_id]', me.lead_id);
+        UTM.forEach(function (k) { if (attr[k]) { direct.searchParams.set('metadata[' + k + ']', attr[k]); direct.searchParams.set(k, attr[k]); } });
+        box.innerHTML = '<div class="ph-slot"><b>The calendar didn\u2019t load</b><p><a href="' + direct.toString().replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">Open the booking page</a> to pick your time, or email <b>' + (CFG.mailtoFallback || 'hello@gtme.school') + '</b> and we\u2019ll schedule it with you.</p></div>';
+      } });
       ['bookingSuccessful', 'bookingSuccessfulV2'].forEach(function (action) {
         cal('on', { action: action, callback: function (e) { var dt = (e && e.detail && e.detail.data) || {}; onBooked({ time: dt.startTime || dt.date || '', ref: (dt.booking && dt.booking.uid) || dt.uid || '' }); } });
       });

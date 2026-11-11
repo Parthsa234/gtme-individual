@@ -9,10 +9,15 @@
  * DB_SETUP_TOKEN once the schema is in place.
  *
  * The SQL (api/_schema.js) is idempotent, so calling this more than once is harmless.
+ *
+ * GET /api/migrate?token=...&lead_id=<lead_id> instead reports that one lead's booking-sync state
+ * (stage, UTM tags, Cal.com booking id / time / status — no name, email or phone), for checking
+ * the Cal.com sync end to end without opening the database.
  */
 'use strict';
 
 const schema = require('./_schema.js');
+const store = require('./_supabase.js');
 
 const CANDIDATES = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL'];
 
@@ -42,6 +47,12 @@ module.exports = async function handler(req, res) {
     return res.status(404).json({ ok: false, error: 'not_found' });
   }
 
+  if (req.query && typeof req.query.lead_id === 'string' && req.query.lead_id) {
+    const r = await store.syncStatus(req.query.lead_id.slice(0, 64));
+    if (!r.ok) return res.status(502).json({ ok: false, error: 'read_failed', status: r.status, detail: r.error });
+    return res.status(r.row ? 200 : 404).json({ ok: Boolean(r.row), row: r.row });
+  }
+
   let Client;
   try { Client = require('pg').Client; } catch (e) {
     return res.status(500).json({ ok: false, error: 'pg_missing', message: 'The "pg" package is not installed in this deployment.' });
@@ -55,7 +66,8 @@ module.exports = async function handler(req, res) {
       await client.connect();
       await client.query(schema.sql);
       const counts = await client.query(
-        'select (select count(*) from public.applications) as applications, (select count(*) from public.application_events) as events');
+        'select (select count(*) from public.applications) as applications, (select count(*) from public.application_events) as events, ' +
+        "(select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'applications' and column_name in ('cal_booking_id','booking_start','booking_status','email_lower')) as booking_columns");
       await client.end();
       return res.status(200).json({
         ok: true,
