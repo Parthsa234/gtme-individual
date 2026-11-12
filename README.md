@@ -239,14 +239,15 @@ To check one lead end to end without opening the database, with `DB_SETUP_TOKEN`
 
 ### Tracking events (individual)
 
-Google Tag Manager (`GTM-NPFX54H8`) is installed in the `<head>` of every page (`vsl.html` and the three
-`/apply/*` pages), with its `<noscript>` iframe right after `<body>`. The site pushes events to the
-`dataLayer`; GTM turns the four funnel events into Meta Pixel events. The site never loads the Pixel
-itself (`tracking.metaPixelId` and `tracking.gtmId` in `config.js` stay empty), so nothing loads twice.
+Google Tag Manager (`GTM-NPFX54H8`) and Meta's Pixel base code (`3411910105669587`) are both in the
+`<head>` of every page (`vsl.html` and the three `/apply/*` pages), each with its `<noscript>` right after
+`<body>`. The Pixel base code sends `PageView`; `track.js` sends the three funnel conversions below to
+the Pixel and pushes every event to the GTM `dataLayer`. `tracking.metaPixelId` and `tracking.gtmId` in
+`config.js` stay empty, so nothing loads twice.
 
 | Meta event | dataLayer event | Fires when | Never fires on |
 |---|---|---|---|
-| `PageView` (standard) | page load (GTM "All Pages") | every page, once per load | — |
+| `PageView` (standard) | `gtme_page_view` | every page, once per load (sent by the Pixel base code) | — |
 | `Lead` (standard) | `gtme_lead` | `/apply/qualified`, after this session's application was accepted by `/api/apply` as qualified | a direct visit, a refresh, a failed submission |
 | `Schedule` (standard) | `gtme_schedule` | `/apply/booked`, after `/api/apply` confirmed the booking with the Cal.com API (`booking_confirmed`) | opening the calendar, picking a time, an unconfirmed booking message, a refresh |
 | `Unqualified` (custom) | `gtme_unqualified` | `/apply/not-a-fit`, after this session's application was accepted as not qualified | a direct visit, a refresh, a failed submission |
@@ -257,21 +258,11 @@ Other dataLayer events, which reach GTM but are not sent to Meta: `gtme_contact_
 saved), `gtme_application_step`, `gtme_submit_application`, `gtme_booking_view`, `gtme_view_content`,
 `gtme_video_progress`, `gtme_downsell_click`. The corporate page is unchanged.
 
-#### Meta Pixel via GTM (set up in the GTM container, not in this code)
+#### Do not add the Meta Pixel in GTM
 
-1. **Variable** · Data Layer Variable, name `event_id` → call it `DLV - event_id`.
-2. **Triggers**
-   - `Site pages`: Page View → *Some Page Views* → `Page Hostname` *does not contain* `cal.com`
-     (the Cal.com calendar can load this container inside its iframe; this keeps that out).
-   - `gtme_lead`, `gtme_schedule`, `gtme_unqualified`: Custom Event, event name exactly as written.
-3. **Tags**
-   - `Meta Pixel - Base` · Custom HTML: the Meta Pixel base code for `3411910105669587`
-     (`fbq('init', …)` and `fbq('track', 'PageView')`) · trigger `Site pages` · firing option *Once per page*.
-   - `Meta - Lead` · Custom HTML `<script>fbq('track','Lead',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_lead`.
-   - `Meta - Schedule` · `<script>fbq('track','Schedule',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_schedule`.
-   - `Meta - Unqualified` · `<script>fbq('trackCustom','Unqualified',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_unqualified`.
-   - On the three event tags: Advanced Settings → Tag Sequencing → *Fire a tag before*: `Meta Pixel - Base`.
-4. **Preview**, run the funnel, then **Submit → Publish**.
+The Pixel is installed in the page code. Adding a Meta Pixel tag in GTM as well would load it twice and
+count every `PageView`, `Lead`, `Schedule` and `Unqualified` twice. Use GTM for other tools (e.g. GA4);
+the `dataLayer` events above are there for that.
 
 Cal.com must not track the same events itself: on the `gtme-school` event, turn off the **Meta Pixel**
 and **Google Tag Manager** apps. Left on, Cal.com fires its own `Schedule` and `PageView` from inside the
