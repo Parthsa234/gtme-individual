@@ -17,8 +17,8 @@ window.GTME_CONFIG = {
     // GTM container GTM-NPFX54H8 is installed directly in every page's <head> (and <noscript> after <body>).
     // Keep this empty, or the container would load twice.
     gtmId: '',
-    // Meta Pixel 3411910105669587 is loaded through GTM (see README, "Meta Pixel via GTM"). Keep this
-    // empty: setting it would load the same Pixel a second time and double every PageView.
+    // Meta Pixel 3411910105669587 is installed directly in each page's <head> (Meta's base code). Keep
+    // this empty: setting it would load the same Pixel a second time and double every PageView.
     metaPixelId: '',
     googleAds: {
       id: '',               // e.g. 'AW-123456789'. Leave empty if Google Ads conversions run through GTM.
