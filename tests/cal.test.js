@@ -49,6 +49,7 @@ global.fetch = async (url, opts) => {
     calCalls++;
     assert.equal(opts.headers.Authorization, 'Bearer cal_test_key');
     const uid = decodeURIComponent(u.pathname.split('/').pop());
+    if (uid === 'uidKeyRejected1') return json(401, { status: 'error', message: 'invalid api key' });
     return calBookings[uid] ? json(200, { status: 'success', data: calBookings[uid] }) : json(404, { status: 'error' });
   }
   assert.equal(u.hostname, 'proj.supabase.co');
@@ -286,4 +287,18 @@ test('the browser report and the webhook for the same booking converge on one co
   ]);
   assert.equal(db.applications.length, 1);
   assert.equal(row().cal_booking_id, 9001); assert.equal(row().booking_status, 'accepted');
+});
+
+test('booking report: the response says why a booking could not be confirmed (for tracing a missing Schedule)', async () => {
+  reset();
+  await post(application);
+  calBookings.uidAAA111 = calBooking();
+  const ok = await post({ funnel: 'individual', stage: 'call_booked', lead_id: LEAD, email: 'asha@example.com', booking_ref: 'uidAAA111' });
+  assert.equal(ok.body.booking_check, 'confirmed'); assert.equal(ok.body.booking_confirmed, true);
+  const orig = console.error; console.error = () => {};
+  const keyBad = await post({ funnel: 'individual', stage: 'call_booked', lead_id: LEAD, email: 'asha@example.com', booking_ref: 'uidKeyRejected1' });
+  console.error = orig;
+  assert.equal(keyBad.code, 200); assert.equal(keyBad.body.booking_check, 'cal_api_401'); assert.equal(keyBad.body.booking_confirmed, undefined);
+  const forged = await post({ funnel: 'individual', stage: 'call_booked', lead_id: LEAD, email: 'asha@example.com', booking_ref: 'uidForged999' });
+  assert.equal(forged.code, 400);
 });

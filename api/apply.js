@@ -98,8 +98,12 @@ async function handler(req, res) {
 
   // A booking reported by the browser is only a hint. Confirm it with Cal.com before storing it.
   let confirmed = null;
+  let bookingCheck;
   if (v.data.funnel === 'individual' && v.data.stage === 'call_booked') {
     const check = await confirmBooking(v.data);
+    bookingCheck = check.booking ? 'confirmed' : (check.reject ? 'rejected_' + check.reject : check.unverified);
+    // One line per booking report (no personal data), so a missing Schedule event can be traced.
+    console.log('[apply] call_booked', JSON.stringify({ lead_id: v.data.lead_id || null, uid: v.data.booking_ref || null, check: bookingCheck }));
     if (check.reject) {
       console.warn('[apply] call_booked rejected:', check.reject, v.data.lead_id || '-');
       return res.status(400).json({ ok: false, error: 'booking_not_verified', message: 'We couldn’t confirm that booking with the calendar.' });
@@ -144,7 +148,8 @@ async function handler(req, res) {
     qualified: v.data.qualified,
     lead_id: (saved && saved.lead_id) || v.data.lead_id || undefined,
     stored: Boolean(saved && saved.ok),
-    booking_confirmed: confirmed ? true : undefined
+    booking_confirmed: confirmed ? true : undefined,
+    booking_check: bookingCheck
   });
 }
 
@@ -157,12 +162,13 @@ async function handler(req, res) {
  *                before; the webhook will write the confirmed details when it arrives
  */
 async function confirmBooking(data) {
-  if (!cal.hasApi() || !data.booking_ref) return {};
+  if (!cal.hasApi()) return { unverified: 'no_cal_api_key' };
+  if (!data.booking_ref) return { unverified: 'no_booking_uid' };
   const r = await cal.getBooking(data.booking_ref);
   if (!r.ok) {
     if (r.status === 404 || r.status === 400) return { reject: 'not_found' };
     console.error('[apply] cal.com lookup failed:', r.status, r.error);
-    return {};
+    return { unverified: 'cal_api_' + (r.status || 'unreachable') }; // e.g. cal_api_401 = CAL_API_KEY rejected
   }
   const b = r.booking;
   if (!cal.isOurEvent(b.event_type)) return { reject: 'other_event_type' };
