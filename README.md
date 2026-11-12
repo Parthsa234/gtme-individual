@@ -239,4 +239,40 @@ To check one lead end to end without opening the database, with `DB_SETUP_TOKEN`
 
 ### Tracking events (individual)
 
-`Lead` when step 1 is saved · `ApplicationStep` per step · `SubmitApplication` (Meta standard event) when the application is sent · `CompleteRegistration` on `/apply/qualified` · `Disqualified` and `DownsellClick` on `/apply/not-a-fit` · `BookingView` and `Schedule` on the calendar. The corporate page is unchanged.
+Google Tag Manager (`GTM-NPFX54H8`) is installed in the `<head>` of every page (`vsl.html` and the three
+`/apply/*` pages), with its `<noscript>` iframe right after `<body>`. The site pushes events to the
+`dataLayer`; GTM turns the four funnel events into Meta Pixel events. The site never loads the Pixel
+itself (`tracking.metaPixelId` and `tracking.gtmId` in `config.js` stay empty), so nothing loads twice.
+
+| Meta event | dataLayer event | Fires when | Never fires on |
+|---|---|---|---|
+| `PageView` (standard) | page load (GTM "All Pages") | every page, once per load | — |
+| `Lead` (standard) | `gtme_lead` | `/apply/qualified`, after this session's application was accepted by `/api/apply` as qualified | a direct visit, a refresh, a failed submission |
+| `Schedule` (standard) | `gtme_schedule` | `/apply/booked`, after `/api/apply` confirmed the booking with the Cal.com API (`booking_confirmed`) | opening the calendar, picking a time, an unconfirmed booking message, a refresh |
+| `Unqualified` (custom) | `gtme_unqualified` | `/apply/not-a-fit`, after this session's application was accepted as not qualified | a direct visit, a refresh, a failed submission |
+
+Each conversion fires once per application (`lead_id`) or booking (Cal.com uid), and carries a stable
+`event_id` (`lead-<lead_id>`, `unqualified-<lead_id>`, `schedule-<uid>`) for Meta de-duplication.
+Other dataLayer events, which reach GTM but are not sent to Meta: `gtme_contact_captured` (step 1
+saved), `gtme_application_step`, `gtme_submit_application`, `gtme_booking_view`, `gtme_view_content`,
+`gtme_video_progress`, `gtme_downsell_click`. The corporate page is unchanged.
+
+#### Meta Pixel via GTM (set up in the GTM container, not in this code)
+
+1. **Variable** · Data Layer Variable, name `event_id` → call it `DLV - event_id`.
+2. **Triggers**
+   - `Site pages`: Page View → *Some Page Views* → `Page Hostname` *does not contain* `cal.com`
+     (the Cal.com calendar can load this container inside its iframe; this keeps that out).
+   - `gtme_lead`, `gtme_schedule`, `gtme_unqualified`: Custom Event, event name exactly as written.
+3. **Tags**
+   - `Meta Pixel - Base` · Custom HTML: the Meta Pixel base code for `3411910105669587`
+     (`fbq('init', …)` and `fbq('track', 'PageView')`) · trigger `Site pages` · firing option *Once per page*.
+   - `Meta - Lead` · Custom HTML `<script>fbq('track','Lead',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_lead`.
+   - `Meta - Schedule` · `<script>fbq('track','Schedule',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_schedule`.
+   - `Meta - Unqualified` · `<script>fbq('trackCustom','Unqualified',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_unqualified`.
+   - On the three event tags: Advanced Settings → Tag Sequencing → *Fire a tag before*: `Meta Pixel - Base`.
+4. **Preview**, run the funnel, then **Submit → Publish**.
+
+Cal.com must not track the same events itself: on the `gtme-school` event, turn off the **Meta Pixel**
+and **Google Tag Manager** apps. Left on, Cal.com fires its own `Schedule` and `PageView` from inside the
+calendar, which double-counts bookings and page views.

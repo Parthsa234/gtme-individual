@@ -111,7 +111,7 @@
       if (form.elements.website && form.elements.website.value) return true; // honeypot: carry on, send nothing
       // Save the contact now, without making the applicant wait for it.
       post({ stage: 'contact', lead_id: state.lead_id, full_name: state.full_name, email: state.email, phone: state.phone, consent: state.consent }, true)
-        .then(function (r) { if (r.ok) { state.contact_saved = true; save(state); track('Lead', { stage: 'contact' }, { persist: true, key: emailKey(state.email) }); return adopt(r, state); } })
+        .then(function (r) { if (r.ok) { state.contact_saved = true; save(state); track('ContactCaptured', { stage: 'contact' }, { persist: true, key: emailKey(state.email) }); return adopt(r, state); } })
         .catch(function () {});
       return true;
     }
@@ -162,17 +162,22 @@
       var o = { stage: 'application', lead_id: state.lead_id, full_name: state.full_name, email: state.email, phone: state.phone, consent: state.consent,
         persona: a.persona, goal: a.goal, tried: a.tried, hours_ok: a.hours_ok, invest: a.invest, start: a.start };
       o.qualified = qualifies(o);
-      state.qualified = o.qualified; save(state);
+      state.qualified = o.qualified; delete state.outcome; save(state); // a failed resubmission must not reuse an earlier outcome
       var dest = o.qualified ? ROUTES.qualified : ROUTES.notQualified;
       if (form.elements.website && form.elements.website.value) { go(dest); return; }
       setBusy(true);
       post(o).then(function (r) {
         if (r.ok) {
           track('SubmitApplication', { qualified: o.qualified }, { persist: true, key: emailKey(o.email) });
-          if (!state.contact_saved) track('Lead', { stage: 'application' }, { persist: true, key: emailKey(o.email) });
           state.submitted = true; save(state);
           box.classList.add('routing');
-          return adopt(r, state).then(function () { go(dest); });
+          /* The qualified / not-a-fit page fires the Meta event (Lead / Unqualified) only when this
+             record says the server accepted this application with that result. Set after adopt(),
+             so it carries the canonical lead_id. */
+          return adopt(r, state).then(function () {
+            state.outcome = { lead_id: state.lead_id, qualified: o.qualified, at: Date.now() }; save(state);
+            go(dest);
+          });
         }
         if ((r.status === 404 || r.status === 405 || r.status === 501 || r.status === 503) && CFG.mailtoFallback) return fallback(o, dest);
         return r.json().catch(function () { return {}; }).then(function (j) { setBusy(false); err.textContent = (j && j.message) || 'Something went wrong sending your application. Please try again in a moment.'; err.hidden = false; });
@@ -198,12 +203,21 @@
   var me = load();
   $$('[data-first-name]').forEach(function (el) { var n = (me.full_name || '').split(/\s+/)[0]; if (n) el.textContent = n; });
 
+  /* Meta conversion events (via GTM; see README "Meta Pixel via GTM"):
+       Lead         /apply/qualified, only after this session's application was accepted as qualified
+       Unqualified  /apply/not-a-fit, only after this session's application was accepted as not qualified
+       Schedule     /apply/booked, only after /api/apply confirmed the booking with the Cal.com API
+     Each fires once per application / booking id (sessionStorage), with a stable event_id. A direct
+     visit, a refresh or the back button fires nothing. */
+  var outcome = me.outcome || null;
   if (page === 'qualified') {
-    track('CompleteRegistration', { status: 'qualified' }, { persist: true, key: me.lead_id || 'direct' });
+    if (outcome && outcome.qualified === true && outcome.lead_id)
+      track('Lead', { funnel_stage: 'booking', qualification_status: 'qualified' }, { persist: true, key: outcome.lead_id, eventId: 'lead-' + outcome.lead_id });
     mountBooking();
   }
   if (page === 'not-a-fit') {
-    track('Disqualified', {}, { persist: true, key: me.lead_id || 'direct' });
+    if (outcome && outcome.qualified === false && outcome.lead_id)
+      track('Unqualified', { funnel_stage: 'downsell', qualification_status: 'unqualified' }, { persist: true, key: outcome.lead_id, eventId: 'unqualified-' + outcome.lead_id });
     var ds = F.downsell || {};
     $$('[data-downsell]').forEach(function (a) {
       if (ds.url) a.href = ds.url; else { a.href = 'mailto:' + (CFG.mailtoFallback || 'hello@gtme.school') + '?subject=' + encodeURIComponent('The recorded GTM engineering course'); }
@@ -213,6 +227,8 @@
     $$('[data-downsell-name]').forEach(function (el) { if (ds.name) el.textContent = ds.name; });
   }
   if (page === 'booked') {
+    if (me.schedule_uid)
+      track('Schedule', { funnel_stage: 'confirmation' }, { persist: true, key: me.schedule_uid, eventId: 'schedule-' + me.schedule_uid });
     var v = F.prepVideoSrc, slot = $('[data-prep-video]');
     if (v && slot) {
       var m, url = null;
@@ -234,21 +250,29 @@
     var attr = attribution();
     var booked = false;
     /* Report the booking to /api/apply, which confirms it with the Cal.com API before storing it.
-       One retry on a network error. The Cal.com webhook records the booking independently, so a
-       closed tab or a failed report never loses it. */
+       Resolves true only when the server answers booking_confirmed. One retry on a network or 5xx
+       error. The Cal.com webhook records the booking independently, so a closed tab or a failed
+       report never loses it from the database. */
     function report(info, attempt) {
-      if (!me.email) return;
-      post({ stage: 'call_booked', lead_id: me.lead_id, email: me.email, full_name: me.full_name, booking_time: (info && info.time) || '', booking_ref: (info && info.ref) || '' }, true)
-        .then(function (r) { if (!r.ok && r.status >= 500 && attempt < 1) setTimeout(function () { report(info, attempt + 1); }, 1500); })
-        .catch(function () { if (attempt < 1) setTimeout(function () { report(info, attempt + 1); }, 1500); });
+      if (!me.email || !(info && info.ref)) return Promise.resolve(false);
+      return post({ stage: 'call_booked', lead_id: me.lead_id, email: me.email, full_name: me.full_name, booking_time: info.time || '', booking_ref: info.ref }, true)
+        .then(function (r) {
+          if (r.ok) return r.json().catch(function () { return {}; }).then(function (j) { return !!(j && j.booking_confirmed); });
+          if (r.status >= 500 && attempt < 1) return wait(1500).then(function () { return report(info, attempt + 1); });
+          return false;
+        })
+        .catch(function () { return attempt < 1 ? wait(1500).then(function () { return report(info, attempt + 1); }) : false; });
     }
+    function wait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
     function onBooked(info) {
       if (booked) return; booked = true;
-      track('Schedule', { content_category: 'individual' }, { persist: true, key: me.lead_id || 'direct' });
-      report(info, 0);
       me.booked = true; me.booking_uid = (info && info.ref) || ''; save(me);
       var ok = $('[data-booked-msg]'); if (ok) ok.hidden = false;
-      go(ROUTES.booked);
+      // Wait for the confirmation (at most 8 s) so the booked page knows whether to fire Schedule.
+      Promise.race([report(info, 0), wait(8000).then(function () { return false; })]).then(function (confirmed) {
+        if (confirmed) { me.schedule_uid = info.ref; save(me); }
+        go(ROUTES.booked);
+      });
     }
     var u;
     try { u = new URL(link); } catch (e) { return; }

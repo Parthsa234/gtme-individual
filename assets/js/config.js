@@ -14,10 +14,12 @@ window.GTME_CONFIG = {
   debug: false,
 
   tracking: {
-    // GTM container GTM-NPFX54H8 is installed directly in vsl.html's <head> (and <noscript> after <body>).
+    // GTM container GTM-NPFX54H8 is installed directly in every page's <head> (and <noscript> after <body>).
     // Keep this empty, or the container would load twice.
     gtmId: '',
-    metaPixelId: '',        // e.g. '123456789012345'
+    // Meta Pixel 3411910105669587 is loaded through GTM (see README, "Meta Pixel via GTM"). Keep this
+    // empty: setting it would load the same Pixel a second time and double every PageView.
+    metaPixelId: '',
     googleAds: {
       id: '',               // e.g. 'AW-123456789'. Leave empty if Google Ads conversions run through GTM.
       conversions: {        // conversion labels, e.g. Lead: 'AbCdEfGhIj'
