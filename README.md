@@ -73,7 +73,7 @@ apply it, in order of convenience:
    value, redeploy, then open `/api/migrate?token=<that value>`. It connects with the Postgres
    credentials the Supabase integration installed, creates everything and reports the row counts.
    **Delete `DB_SETUP_TOKEN` afterwards** — without it the route answers 404 and does nothing.
-2. **Supabase SQL editor.** Paste `supabase/migrations/0001_applications.sql` and run it.
+2. **Supabase SQL editor.** Paste `supabase/migrations/0001_applications.sql`, then `0002_cal_bookings.sql`, and run them.
 3. **Locally.** `vercel env pull .env.local`, then `POSTGRES_URL='postgresql://…' npm run migrate`.
 
 ## Configure — `assets/js/config.js`
@@ -130,11 +130,14 @@ assets/js/motion.js            v2 motion only: scroll progress, counters, sticky
 api/apply.js                   serverless form handler (validation, honeypot, Supabase, webhook forwarding)
 api/_supabase.js               writes each submission to the applications / application_events tables
 api/_schema.js                 the schema both migration paths apply
-api/migrate.js                 one-time, DB_SETUP_TOKEN-guarded route that creates the tables
+api/migrate.js                 one-time, DB_SETUP_TOKEN-guarded route that creates the tables (and checks one lead's booking sync)
+api/cal-webhook.js             Cal.com webhook: signed booking events → the application row in Supabase
+api/_cal.js                    Cal.com API client, webhook signature check, booking normalisation
 supabase/migrations/*.sql      the same schema, to paste into the Supabase SQL editor
 scripts/migrate.js             applies the schema from a connection string (`npm run migrate`)
 scripts/dev.js                 local server that mirrors vercel.json
 tests/apply.test.js            handler tests
+tests/cal.test.js              booking sync tests (webhook + browser report, against an in-memory Supabase / Cal.com fake)
 ```
 
 ## Still needed before ads go live
@@ -182,8 +185,94 @@ Every request carries the same `lead_id`, so one `applications` row — and any 
 |---|---|---|
 | `contact` | `started` | step 1 completed |
 | `application` | `qualified` / `not_qualified` | all 7 steps sent |
-| `call_booked` | `call_booked` | call booked on `/apply/qualified` (includes `booking_time`, `booking_ref`) |
+| `call_booked` | `call_booked` | call booked on `/apply/qualified` (includes `booking_time`, `booking_ref`), confirmed with Cal.com |
+| (Cal.com webhook) | `call_booked` / `call_requested` / `call_cancelled` / `call_rejected` | booking created, rescheduled, requested, cancelled or rejected in Cal.com |
+
+### Cal.com booking sync
+
+```
+form (/vsl) ──▶ /api/apply ──▶ Supabase row (answers + utm_source/medium/campaign/term/content)
+                                   ▲
+/apply/qualified: Cal.com embed    │  lead_id, name, email, UTM tags passed into the booking
+   │ booking confirmed             │
+   ├─ browser ─▶ /api/apply (stage call_booked) ─ checked with the Cal.com API ─┤
+   └─ Cal.com ─▶ /api/cal-webhook (signed) ───── re-read from the Cal.com API ──┘
+```
+
+- **No repeated questions.** The `gtme-school` event asks nothing the form already asked: name and
+  email are prefilled from the application (Cal.com requires both, so they can't be removed), and
+  the phone question is hidden. The name is locked; the email stays editable because Cal.com refuses
+  addresses that can't receive mail, and an applicant with a typo must be able to fix it. Only the
+  optional notes and guests fields remain.
+- **Booking → row.** Either path writes `cal_booking_id`, `cal_booking_uid`, `booking_start`,
+  `booking_end`, `booking_status` (accepted / pending / cancelled / rejected) and `lead_stage` onto the
+  applicant's row. The webhook is the reliable one: it works even if the applicant closes the tab
+  right after booking, and it also records reschedules and cancellations.
+- **Matching.** `metadata.lead_id` on the booking (set by the embed) → the booking uid (or the uid a
+  reschedule replaced) → the attendee's email. A booking made from the bare Cal.com link without
+  applying still gets its own row.
+- **Safety.** Webhooks without a valid `X-Cal-Signature-256` get 401. Every booking is re-read from
+  the Cal.com API before it is stored, and a browser report for a uid Cal.com doesn't know, or that
+  belongs to someone else, gets 400. The API key and webhook secret only exist as server-side
+  environment variables.
+- **Duplicates.** A repeat application from the same email (new tab, other device) merges onto the
+  first row. A webhook delivered twice is logged once. Each write carries the time Cal.com produced
+  that state, and an older state never overwrites a newer one, so late or out-of-order deliveries
+  are harmless. The same browser session is not offered a second booking.
+- **Failures.** If the calendar fails to load, the page offers the direct booking link (prefilled)
+  and the email address. If the browser report fails it is retried once, and the webhook still
+  records the booking.
+
+| Variable | |
+|---|---|
+| `CAL_API_KEY` | Cal.com → Settings → Developer → API keys. Used to confirm every booking. |
+| `CAL_WEBHOOK_SECRET` | The secret set on the Cal.com webhook. Without it `/api/cal-webhook` answers 503. |
+| `CAL_EVENT_SLUGS` | Optional. Event slugs to sync, comma-separated. Default `gtme-school,gtme-school-copy`. |
+
+The Cal.com webhook (event type `gtme-school` → Webhooks) points at
+`https://<site>/api/cal-webhook` with triggers Booking created, rescheduled, requested, cancelled
+and rejected, and the same secret as `CAL_WEBHOOK_SECRET`.
+
+To check one lead end to end without opening the database, with `DB_SETUP_TOKEN` set:
+`/api/migrate?token=<token>&lead_id=<lead_id>` returns its stage, UTM tags and booking columns
+(no name, email or phone).
 
 ### Tracking events (individual)
 
-`Lead` when step 1 is saved · `ApplicationStep` per step · `SubmitApplication` (Meta standard event) when the application is sent · `CompleteRegistration` on `/apply/qualified` · `Disqualified` and `DownsellClick` on `/apply/not-a-fit` · `BookingView` and `Schedule` on the calendar. The corporate page is unchanged.
+Google Tag Manager (`GTM-NPFX54H8`) is installed in the `<head>` of every page (`vsl.html` and the three
+`/apply/*` pages), with its `<noscript>` iframe right after `<body>`. The site pushes events to the
+`dataLayer`; GTM turns the four funnel events into Meta Pixel events. The site never loads the Pixel
+itself (`tracking.metaPixelId` and `tracking.gtmId` in `config.js` stay empty), so nothing loads twice.
+
+| Meta event | dataLayer event | Fires when | Never fires on |
+|---|---|---|---|
+| `PageView` (standard) | page load (GTM "All Pages") | every page, once per load | — |
+| `Lead` (standard) | `gtme_lead` | `/apply/qualified`, after this session's application was accepted by `/api/apply` as qualified | a direct visit, a refresh, a failed submission |
+| `Schedule` (standard) | `gtme_schedule` | `/apply/booked`, after `/api/apply` confirmed the booking with the Cal.com API (`booking_confirmed`) | opening the calendar, picking a time, an unconfirmed booking message, a refresh |
+| `Unqualified` (custom) | `gtme_unqualified` | `/apply/not-a-fit`, after this session's application was accepted as not qualified | a direct visit, a refresh, a failed submission |
+
+Each conversion fires once per application (`lead_id`) or booking (Cal.com uid), and carries a stable
+`event_id` (`lead-<lead_id>`, `unqualified-<lead_id>`, `schedule-<uid>`) for Meta de-duplication.
+Other dataLayer events, which reach GTM but are not sent to Meta: `gtme_contact_captured` (step 1
+saved), `gtme_application_step`, `gtme_submit_application`, `gtme_booking_view`, `gtme_view_content`,
+`gtme_video_progress`, `gtme_downsell_click`. The corporate page is unchanged.
+
+#### Meta Pixel via GTM (set up in the GTM container, not in this code)
+
+1. **Variable** · Data Layer Variable, name `event_id` → call it `DLV - event_id`.
+2. **Triggers**
+   - `Site pages`: Page View → *Some Page Views* → `Page Hostname` *does not contain* `cal.com`
+     (the Cal.com calendar can load this container inside its iframe; this keeps that out).
+   - `gtme_lead`, `gtme_schedule`, `gtme_unqualified`: Custom Event, event name exactly as written.
+3. **Tags**
+   - `Meta Pixel - Base` · Custom HTML: the Meta Pixel base code for `3411910105669587`
+     (`fbq('init', …)` and `fbq('track', 'PageView')`) · trigger `Site pages` · firing option *Once per page*.
+   - `Meta - Lead` · Custom HTML `<script>fbq('track','Lead',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_lead`.
+   - `Meta - Schedule` · `<script>fbq('track','Schedule',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_schedule`.
+   - `Meta - Unqualified` · `<script>fbq('trackCustom','Unqualified',{},{eventID:{{DLV - event_id}}});</script>` · trigger `gtme_unqualified`.
+   - On the three event tags: Advanced Settings → Tag Sequencing → *Fire a tag before*: `Meta Pixel - Base`.
+4. **Preview**, run the funnel, then **Submit → Publish**.
+
+Cal.com must not track the same events itself: on the `gtme-school` event, turn off the **Meta Pixel**
+and **Google Tag Manager** apps. Left on, Cal.com fires its own `Schedule` and `PageView` from inside the
+calendar, which double-counts bookings and page views.

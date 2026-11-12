@@ -5,11 +5,13 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 const apply = require('../api/apply.js');
+const calWebhook = require('../api/cal-webhook.js');
 const routes = {'/': '/vsl.html', '/vsl': '/vsl.html', '/apply/qualified': '/apply-qualified.html', '/apply/not-a-fit': '/apply-not-a-fit.html', '/apply/booked': '/apply-booked.html'};
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp4': 'video/mp4', '.json': 'application/json' };
 
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/api/cal-webhook') return calWebhook(req, res); // reads the raw body itself (signature check)
   if (url.pathname === '/api/apply') {
     let raw = ''; req.on('data', c => { raw += c; if (raw.length > 1e5) req.destroy(); });
     req.on('end', () => {

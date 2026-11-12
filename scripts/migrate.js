@@ -24,7 +24,7 @@ function clientOptions(connectionString) {
 async function main() {
   const files = [schema];
   const urls = CANDIDATES.map(function (k) { return { key: k, url: process.env[k] }; }).filter(function (c) { return c.url; });
-  if (!urls.length) return console.warn('[migrate] no Postgres connection string in the environment (' + CANDIDATES.join(', ') + ') — skipping. Use GET /api/migrate?token=... instead, or paste supabase/migrations/0001_applications.sql into the Supabase SQL editor.');
+  if (!urls.length) return console.warn('[migrate] no Postgres connection string in the environment (' + CANDIDATES.join(', ') + ') — skipping. Use GET /api/migrate?token=... instead, or paste supabase/migrations/0001_applications.sql and 0002_cal_bookings.sql into the Supabase SQL editor.');
 
   let Client;
   try { Client = require('pg').Client; } catch (e) {

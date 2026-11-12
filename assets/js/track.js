@@ -12,6 +12,11 @@
  *   - in sessionStorage for events marked { persist: true } (Lead, CompleteRegistration, Schedule),
  *     so a refresh or a second submit cannot report the same conversion twice.
  * Every event carries an eventID that can be reused for Meta Conversions API de-duplication.
+ *
+ * Meta Pixel: loaded by Google Tag Manager (GTM-NPFX54H8, installed in each page's <head>), not by
+ * this file. Leave tracking.metaPixelId and tracking.gtmId empty in config.js, or the Pixel/GTM
+ * would load twice. GTM reads the dataLayer events pushed here (gtme_lead, gtme_schedule,
+ * gtme_unqualified, ...) and fires the matching Meta events.
  */
 (function (w, d) {
   'use strict';
@@ -62,7 +67,9 @@
    * Report an event.
    * @param {string} name   PageView | ViewContent | Lead | CompleteRegistration | Schedule | any custom name
    * @param {object} params extra parameters (no personal data: never pass names, emails or phone numbers)
-   * @param {object} opts   { key: dedupe key suffix, persist: true to dedupe across the session }
+   * @param {object} opts   { key: dedupe key suffix, persist: true to dedupe across the session,
+   *                          eventId: a stable id (e.g. 'lead-<lead_id>') instead of a random one, so
+   *                          the same conversion always carries the same event_id for Meta de-duplication }
    * @returns {boolean} true if the event fired, false if it was a duplicate
    */
   function event(name, params, opts) {
@@ -72,7 +79,7 @@
     if (fired[key] || (opts.persist && store(key))) { if (debug) console.info('[gtme] skipped duplicate', name); return false; }
     fired[key] = 1; if (opts.persist) store(key, '1');
 
-    var eventID = uid();
+    var eventID = opts.eventId ? String(opts.eventId).slice(0, 100) : uid();
     var payload = Object.assign({ funnel: funnel }, params);
 
     w.dataLayer.push(Object.assign({ event: 'gtme_' + name.replace(/[A-Z]/g, function (c, i) { return (i ? '_' : '') + c.toLowerCase(); }), event_id: eventID }, payload));
