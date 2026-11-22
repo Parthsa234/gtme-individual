@@ -67,7 +67,8 @@ module.exports = async function handler(req, res) {
       await client.query(schema.sql);
       const counts = await client.query(
         'select (select count(*) from public.applications) as applications, (select count(*) from public.application_events) as events, ' +
-        "(select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'applications' and column_name in ('cal_booking_id','booking_start','booking_status','email_lower')) as booking_columns");
+        "(select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'applications' and column_name in ('cal_booking_id','booking_start','booking_status','email_lower')) as booking_columns, " +
+        '(select count(*) from public.brochure_leads) as brochure_leads, (select count(*) from public.brochure_download_events) as brochure_download_events');
       await client.end();
       return res.status(200).json({
         ok: true,

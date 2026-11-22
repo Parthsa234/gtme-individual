@@ -56,7 +56,10 @@ fbq('track', 'PageView');
 <header class="top"><div class="wrap">
   <a class="brand" href="https://gtme.school" aria-label="GTME.School home"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#F4F3F0"/><path d="M5.5 13.2 16 6l10.5 7.2z" fill="#C2400F"/><rect x="8" y="15" width="2.8" height="9" fill="#0E0E0E"/><rect x="14.6" y="15" width="2.8" height="9" fill="#0E0E0E"/><rect x="21.2" y="15" width="2.8" height="9" fill="#0E0E0E"/><rect x="5.5" y="25" width="21" height="2.2" fill="#0E0E0E"/></svg><span>GTME<span class="dot">.</span>School</span><small>GTM Engineering</small></a>
   <nav aria-label="Page sections"><a href="#proof">Results</a><a href="#apply">Apply</a><a href="#curriculum">Curriculum</a><a href="#program">Investment</a><a href="#faq">FAQ</a></nav>
-  <a class="btn btn-primary btn-sm" href="#apply"><span class="full">Apply for the Program</span><span class="short" aria-hidden="true">Apply</span> <span class="arr" aria-hidden="true">→</span></a>
+  <div class="top-act">
+    <button class="nav-bro" type="button" data-brochure-open="nav" aria-haspopup="dialog" aria-controls="brochure" aria-label="Download Brochure" hidden><span class="nav-bro-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></span><span class="nav-bro-t" aria-hidden="true">Brochure</span></button>
+    <a class="btn btn-primary btn-sm" href="#apply"><span class="full">Apply for the Program</span><span class="short" aria-hidden="true">Apply</span> <span class="arr" aria-hidden="true">→</span></a>
+  </div>
   <span class="progress" aria-hidden="true"></span>
 </div></header>
 
@@ -319,7 +322,7 @@ fbq('track', 'PageView');
     <details><summary><span class="m">M6</span><span class="t"><b>Dashboard</b><span>Know what to keep and what to kill.</span></span><span class="one">Opportunities by segment</span><i aria-hidden="true">+</i></summary><div class="a"><p>The weekly scoreboard: sent, replies and opportunities by segment, read from the sequencer and the CRM. New segments and angles come from the numbers, not gut feel.</p><ul><li>What to count, what to cut</li><li>Read live during sessions</li><li>The view a buyer actually reads</li></ul><p class="tools">Tools · HubSpot, sequencer analytics</p></div></details>
   </div>
   <p class="note">Across all six: how signals, enrichment, the agent, the sequencer and the CRM pass data to each other. Where a script helps, you get the script and we show you what it does.</p>
-  <div class="ctas" style="margin-top:28px"><a class="btn btn-primary" href="#apply">Apply for the Program <span class="arr" aria-hidden="true">→</span></a><a class="btn btn-ghost btn-sm" data-curriculum href="#" target="_blank" rel="noopener" hidden>Download the curriculum</a></div>
+  <div class="ctas" style="margin-top:28px"><a class="btn btn-primary" href="#apply">Apply for the Program <span class="arr" aria-hidden="true">→</span></a><button class="btn btn-ghost" type="button" data-brochure-open="curriculum" aria-haspopup="dialog" aria-controls="brochure" hidden>Download Brochure <svg class="bro-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14"/></svg></button><a class="btn btn-ghost btn-sm" data-curriculum href="#" target="_blank" rel="noopener" hidden>Download the curriculum</a></div>
 </div></section>
 
 <!-- 8 · FOUNDER -->
@@ -404,10 +407,62 @@ fbq('track', 'PageView');
 
 <div class="mbar" aria-hidden="false"><a class="btn btn-primary" href="#apply">Apply for the Program <span class="arr" aria-hidden="true">→</span></a></div>
 
+<!-- Brochure download: lead form in a side drawer (assets/js/brochure.js → /api/brochure) -->
+<div class="bro" id="brochure" hidden>
+  <div class="bro-scrim" data-bro-close></div>
+  <div class="bro-panel" role="dialog" aria-modal="true" aria-labelledby="bro-h" aria-describedby="bro-sub" tabindex="-1">
+    <div class="bro-head">
+      <h2 id="bro-h">Fill in the form to get the brochure</h2>
+      <button class="bro-x" type="button" data-bro-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+
+    <form class="bro-form" id="brochure-form" novalidate aria-label="Brochure download form">
+      <div class="bro-body">
+        <p class="bro-sub" id="bro-sub">The GTM Engineering Programme prospectus, 2026–27: curriculum, format, fees and admissions. 15-page PDF.</p>
+        <div class="form-error" role="alert" tabindex="-1" hidden></div>
+        <div class="f"><label for="bro-name">Name <span class="req" aria-hidden="true">*</span></label><input id="bro-name" name="full_name" autocomplete="name" required maxlength="120" placeholder="Enter name" aria-describedby="bro-name-err"><span class="err" id="bro-name-err"></span></div>
+        <div class="f"><label for="bro-email">Email <span class="req" aria-hidden="true">*</span></label><input id="bro-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="160" placeholder="Enter email" aria-describedby="bro-email-err"><span class="err" id="bro-email-err"></span></div>
+        <div class="f"><label for="bro-phone">Phone number <span class="req" aria-hidden="true">*</span></label>
+          <div class="bro-tel">
+            <select id="bro-cc" name="country_code" aria-label="Country code" autocomplete="tel-country-code">
+              <option value="+91" selected>IN +91</option><option value="+1">US +1</option><option value="+1">CA +1</option><option value="+44">UK +44</option><option value="+971">AE +971</option><option value="+65">SG +65</option><option value="+61">AU +61</option><option value="+64">NZ +64</option><option value="+966">SA +966</option><option value="+974">QA +974</option><option value="+965">KW +965</option><option value="+968">OM +968</option><option value="+973">BH +973</option><option value="+49">DE +49</option><option value="+33">FR +33</option><option value="+31">NL +31</option><option value="+353">IE +353</option><option value="+34">ES +34</option><option value="+39">IT +39</option><option value="+41">CH +41</option><option value="+46">SE +46</option><option value="+972">IL +972</option><option value="+977">NP +977</option><option value="+880">BD +880</option><option value="+94">LK +94</option><option value="+92">PK +92</option><option value="+60">MY +60</option><option value="+62">ID +62</option><option value="+63">PH +63</option><option value="+66">TH +66</option><option value="+84">VN +84</option><option value="+27">ZA +27</option><option value="+234">NG +234</option><option value="+254">KE +254</option><option value="+55">BR +55</option><option value="+52">MX +52</option>
+            </select>
+            <input id="bro-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" required maxlength="20" placeholder="Enter phone number" aria-describedby="bro-phone-hint bro-phone-err">
+          </div>
+          <span class="hint" id="bro-phone-hint">Country not listed? Type the full number starting with +.</span>
+          <span class="err" id="bro-phone-err"></span>
+        </div>
+        <div class="f"><label for="bro-prof">What best describes you? <span class="req" aria-hidden="true">*</span></label>
+          <select id="bro-prof" name="profession" required aria-describedby="bro-prof-err">
+            <option value="" selected disabled>Select one</option>
+            <option>Student</option><option>Working Professional</option><option>Agency Owner</option><option>Freelancer</option><option>Founder / Business Owner</option><option>Other</option>
+          </select><span class="err" id="bro-prof-err"></span></div>
+        <div class="hp" aria-hidden="true"><label for="bro-website">Website</label><input id="bro-website" name="website" tabindex="-1" autocomplete="off"></div>
+      </div>
+      <div class="bro-foot">
+        <button class="btn btn-primary" type="submit" data-label="Download brochure"><span class="lbl">Download brochure</span><span class="spin" aria-hidden="true"></span><svg class="bro-ic arr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14"/></svg></button>
+        <p class="bro-fine">By downloading, I agree that GTME.School may contact me about the programme by email, phone or WhatsApp.</p>
+      </div>
+    </form>
+
+    <div class="bro-done" tabindex="-1" hidden>
+      <div class="bro-body">
+        <span class="badge-ok">Brochure ready</span>
+        <h3>Thank you! Your GTME brochure is ready.</h3>
+        <p class="bro-status" role="status" aria-live="polite">Your download should start automatically.</p>
+        <a class="btn btn-primary" data-bro-file href="/assets/docs/GTME-School-Brochure.pdf" download="GTME-School-Brochure.pdf" target="_blank" rel="noopener">Download the brochure <svg class="bro-ic arr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14"/></svg></a>
+        <p class="bro-fine">Download didn't start? Use the button above to open the PDF.</p>
+        <p class="bro-next">Ready to talk about the programme? <a href="#apply" data-bro-close>Apply now →</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/assets/js/config.js"></script>
 <script src="/assets/js/track.js"></script>
 <script src="/assets/js/vsl.js"></script>
 <script src="/assets/js/motion.js"></script>
 <script src="/assets/js/apply-flow.js"></script>
+<script src="/assets/js/brochure.js"></script>
 </body>
 </html>

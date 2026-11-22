@@ -73,7 +73,7 @@ apply it, in order of convenience:
    value, redeploy, then open `/api/migrate?token=<that value>`. It connects with the Postgres
    credentials the Supabase integration installed, creates everything and reports the row counts.
    **Delete `DB_SETUP_TOKEN` afterwards** — without it the route answers 404 and does nothing.
-2. **Supabase SQL editor.** Paste `supabase/migrations/0001_applications.sql`, then `0002_cal_bookings.sql`, and run them.
+2. **Supabase SQL editor.** Paste `supabase/migrations/0001_applications.sql`, then `0002_cal_bookings.sql`, then `0003_brochure_leads.sql`, and run them.
 3. **Locally.** `vercel env pull .env.local`, then `POSTGRES_URL='postgresql://…' npm run migrate`.
 
 ## Configure — `assets/js/config.js`
@@ -126,17 +126,21 @@ assets/css/vsl.css             previous design, no longer linked by the pages (s
 assets/js/config.js            all configuration
 assets/js/track.js             tracking hooks (GTMETrack.event)
 assets/js/vsl.js               video, testimonials, proof slots, form, qualification, Calendly, FAQ
+assets/js/brochure.js          brochure drawer: form, validation, download, tracking
+assets/docs/GTME-School-Brochure.pdf  the brochure (programme prospectus 2026–27)
 assets/js/motion.js            v2 motion only: scroll progress, counters, sticky engine, live-build demo, tabs, rails, calculator
 api/apply.js                   serverless form handler (validation, honeypot, Supabase, webhook forwarding)
 api/_supabase.js               writes each submission to the applications / application_events tables
 api/_schema.js                 the schema both migration paths apply
 api/migrate.js                 one-time, DB_SETUP_TOKEN-guarded route that creates the tables (and checks one lead's booking sync)
+api/brochure.js                brochure lead capture (validation, honeypot, Supabase RPC, download status)
 api/cal-webhook.js             Cal.com webhook: signed booking events → the application row in Supabase
 api/_cal.js                    Cal.com API client, webhook signature check, booking normalisation
 supabase/migrations/*.sql      the same schema, to paste into the Supabase SQL editor
 scripts/migrate.js             applies the schema from a connection string (`npm run migrate`)
 scripts/dev.js                 local server that mirrors vercel.json
 tests/apply.test.js            handler tests
+tests/brochure.test.js         brochure handler tests
 tests/cal.test.js              booking sync tests (webhook + browser report, against an in-memory Supabase / Cal.com fake)
 ```
 
@@ -267,3 +271,37 @@ the `dataLayer` events above are there for that.
 Cal.com must not track the same events itself: on the `gtme-school` event, turn off the **Meta Pixel**
 and **Google Tag Manager** apps. Left on, Cal.com fires its own `Schedule` and `PageView` from inside the
 calendar, which double-counts bookings and page views.
+
+## Brochure download (lead capture)
+
+```
+"Brochure" (nav bar) / "Download Brochure" (curriculum) ── drawer form ── POST /api/brochure
+   name · email · phone (country code) · "What best describes you?"        │ validate + sanitise again
+                                                                            ▼
+                         public.brochure_capture()  (one transaction, service role only)
+                           rate limit → upsert brochure_leads on lower(email) → new brochure_download_events row ('requested')
+                                                                            │
+   ◀── { event_id, token, download_url } ───────────────────────────────────┘
+   browser fetches /assets/docs/GTME-School-Brochure.pdf and saves it ──▶ POST /api/brochure {action:'status'} → 'initiated' | 'failed'
+```
+
+- **Tables** (`supabase/migrations/0003_brochure_leads.sql`): `brochure_leads` (one row per person, unique on
+  `lower(email)` in this table only) and `brochure_download_events` (one row per request, `lead_id` → `brochure_leads.id`).
+  `brochure_downloads_overview` joins them for reading. A repeat request updates name / phone / profession and keeps
+  the first-touch source and UTMs; every request adds an event.
+- **Statuses**: `requested` (form accepted, lead stored) → `initiated` (the browser was handed the file, or the visitor
+  tapped the manual button) or `failed` (the file fetch failed; `failure_reason` says how). No browser confirms a file
+  was saved, so nothing claims that. In-app browsers (Instagram / Facebook) skip the auto-download and show the
+  button, because they can't save files that way; those events stay `requested` until it's tapped.
+- **Security**: RLS on with no policies, privileges revoked from `anon` / `authenticated`, functions executable by
+  `service_role` only. The response carries no lead data. Spam: honeypot field, cross-origin POSTs refused, and the
+  database allows 5 requests per email per 10 minutes and 20 per IP per hour (the IP is stored only as a salted hash).
+  Status reports need an HMAC token issued with the request. Logs carry event ids and status codes, never personal data.
+- **The PDF** is a static file. The form gates the button, not the URL: anyone with the direct link can open it.
+  To publish a new edition, replace the file and bump `BROCHURE.version` in `api/brochure.js`.
+- **Tracking** (custom Meta events through the existing Pixel, and the GTM dataLayer): `BrochureFormOpened`
+  (`gtme_brochure_form_opened`, once per page load), `BrochureLeadSubmitted` (`gtme_brochure_lead_submitted`) and
+  `BrochureDownloadInitiated` (`gtme_brochure_download_initiated`), once per download event. The standard `Lead`
+  event is deliberately not used, so brochure downloads never count as applications in ad optimisation.
+
+Read the data: Supabase → SQL editor, `select * from brochure_downloads_overview limit 50;`
