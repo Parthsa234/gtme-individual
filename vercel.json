@@ -49,6 +49,23 @@
           "value": "public, max-age=604800"
         }
       ]
+    },
+    {
+      "source": "/assets/docs/GTME-School-Brochure.pdf",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/pdf"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "inline; filename=\"GTME-School-Brochure.pdf\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
     }
   ],
   "redirects": [

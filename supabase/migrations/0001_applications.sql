@@ -103,8 +103,11 @@ create index if not exists application_events_created_at_idx on public.applicati
 alter table public.applications       enable row level security;
 alter table public.application_events enable row level security;
 
--- A readable view of the funnel for the dashboard.
-create or replace view public.applications_overview as
+-- A readable view of the funnel for the dashboard. Created only when missing: 0002 replaces it with
+-- more columns, and re-running this "create or replace" afterwards would fail ("cannot drop columns
+-- from view") and abort the whole migration script.
+do $mig$ begin if to_regclass('public.applications_overview') is null then execute $v$
+create view public.applications_overview as
 select
   lead_id,
   created_at,
@@ -121,7 +124,8 @@ select
   utm_campaign,
   booked_at
 from public.applications
-order by created_at desc;
+order by created_at desc
+$v$; end if; end $mig$;
 
 comment on table public.applications is
   'One row per VSL applicant, upserted on lead_id by /api/apply as they move through the stages.';

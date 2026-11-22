@@ -15,7 +15,8 @@
  *
  * Meta Pixel 3411910105669587: Meta's base code is in each page's <head>; it initialises the Pixel and
  * sends PageView. This file only adds the funnel conversions, and only these (META_EVENTS):
- *   Lead (standard), Schedule (standard), Unqualified (custom)
+ *   Lead (standard), Schedule (standard), Unqualified (custom),
+ *   BrochureFormOpened, BrochureLeadSubmitted, BrochureDownloadInitiated (custom, from brochure.js)
  * Every other event (steps, video, ...) goes to the GTM dataLayer only, never to Meta. Leave
  * tracking.metaPixelId and tracking.gtmId empty in config.js, and do not add a Meta Pixel tag in GTM:
  * either would load the Pixel a second time and double-count.
@@ -25,7 +26,7 @@
   var cfg = (w.GTME_CONFIG && w.GTME_CONFIG.tracking) || {};
   var debug = !!(w.GTME_CONFIG && w.GTME_CONFIG.debug) || /[?&]debug=1\b/.test(w.location.search);
   // Sent to the Meta Pixel (loaded by the page's base code). Standard events use 'track', others 'trackCustom'.
-  var META_EVENTS = { Lead: 1, Schedule: 1, Unqualified: 1 };
+  var META_EVENTS = { Lead: 1, Schedule: 1, Unqualified: 1, BrochureFormOpened: 1, BrochureLeadSubmitted: 1, BrochureDownloadInitiated: 1 };
   var META_STANDARD = { PageView: 1, ViewContent: 1, Lead: 1, CompleteRegistration: 1, Schedule: 1, Contact: 1, SubmitApplication: 1 };
   var fired = {};
   w.__gtmeEvents = w.__gtmeEvents || [];

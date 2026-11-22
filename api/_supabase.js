@@ -269,4 +269,10 @@ async function syncStatus(leadId) {
     'cal_booking_id,cal_booking_uid,cal_event_type,booking_start,booking_end,booking_status,booking_source,booking_last_trigger,booking_event_at,booked_at,created_at,updated_at');
 }
 
-module.exports = { isConfigured, save, toRow, resolveLeadId, fallbackLeadId, findForBooking, applyBooking, createFromBooking, logEvent, bookingRow, syncStatus };
+/** Call a Postgres function through PostgREST (POST /rest/v1/rpc/<fn>). { ok, status, data, error }. */
+async function rpc(fn, args) {
+  if (!isConfigured()) return { ok: false, status: 0, error: 'not_configured' };
+  return request('rpc/' + fn, args || {}, 'return=representation');
+}
+
+module.exports = { isConfigured, rpc, save, toRow, resolveLeadId, fallbackLeadId, findForBooking, applyBooking, createFromBooking, logEvent, bookingRow, syncStatus };
