@@ -849,3 +849,6 @@ html,body{overflow-x:clip}
 .bro-next{margin-top:8px;padding-top:16px;border-top:1px solid var(--nline);font-size:14px;color:var(--ndim)}
 .bro-next a{color:var(--flame);font-weight:500}
 @media (max-width:640px){.bro-head{padding:18px 20px 10px}.bro-head h2{font-size:20px}.bro-body{padding:2px 20px 20px;gap:14px}.bro-sub{font-size:13.5px}.bro .f input,.bro .f select{min-height:46px;padding-block:10px}.bro-foot{padding-inline:16px}.bro-tel{grid-template-columns:100px 1fr}}
+/* pricing card: Apply and Download Brochure side by side, same height and width; stacked on narrow screens */
+.track-ctas{margin-top:24px;gap:12px}
+.track-ctas .btn{flex:1 1 210px}
