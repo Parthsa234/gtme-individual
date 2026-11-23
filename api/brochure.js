@@ -86,8 +86,13 @@ function ipHash(req) {
 function sameOrigin(req) {
   const h = req.headers || {};
   if (!h.origin) return true;
-  try { return new URL(h.origin).host === (h['x-forwarded-host'] || h.host); } catch (e) { return false; }
+  let host;
+  try { host = new URL(h.origin).host; } catch (e) { return false; }
+  /* gtme.school/vsl proxies to this project, so its pages post from the main site's host. */
+  if (PROXY_HOSTS.indexOf(host) > -1) return true;
+  return host === (h['x-forwarded-host'] || h.host);
 }
+const PROXY_HOSTS = ['gtme.school', 'www.gtme.school'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function handler(req, res) {
